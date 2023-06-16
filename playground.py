@@ -1,0 +1,153 @@
+from typing import List
+import os
+from functools import partial
+import torch
+from torch.utils.data import DataLoader
+from dataset import LOUO_Dataset
+
+from model import RecognitionModel, ScheduledOptim, get_tgt_mask
+
+
+# cross validation files handling
+data_path = os.path.join(".", "new_dataset", "gestures")
+
+def _get_files_except_user(data_path, user_id: int) -> List[str]:
+    files = os.listdir(data_path)
+    csv_files = [p for p in files if p.endswith(".csv")]
+    except_user = [os.path.join(data_path, p) for p in csv_files if not p.startswith(f"Peg_Transfer_S0{user_id}")]
+    user = [os.path.join(data_path, p) for p in csv_files if p.startswith(f"Peg_Transfer_S0{user_id}")]
+    return except_user, user 
+
+
+# building train and validation datasets and dataloaders
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+observation_window = 10
+prediction_window = 20
+batch_size = 64
+train_files_path, valid_files_path = _get_files_except_user(data_path, 1)
+train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window)
+valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window)
+
+train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device))
+valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device))
+
+print("datasets lengths: ", len(train_dataset), len(valid_dataset))
+print("X shape: ", train_dataset.X.shape, valid_dataset.X.shape)
+print("Y shape: ", train_dataset.Y.shape, valid_dataset.Y.shape)
+
+
+# training params
+torch.manual_seed(0)
+
+TGT_VOCAB_SIZE = len(train_dataloader.dataset.le.classes_)
+EMB_SIZE = 512
+NHEAD = 8
+FFN_HID_DIM = 512
+BATCH_SIZE = 128
+NUM_ENCODER_LAYERS = 3
+NUM_DECODER_LAYERS = 3
+
+# model initialization
+recognition_transformer = RecognitionModel()
+for p in recognition_transformer.parameters():
+    if p.dim() > 1:
+        torch.nn.init.xavier_uniform_(p)
+transformer = recognition_transformer.to(device)
+
+# loss function
+loss_fn = torch.nn.CrossEntropyLoss()
+
+# optimizer
+optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=EMB_SIZE, n_warmup_steps=2000)
+
+
+
+def train_epoch(model, optimizer):
+    model.train()
+    losses = 0
+
+    for i, (src, tgt, future) in enumerate(train_dataloader):
+
+        src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
+        tgt_input = tgt[:-1, :].transpose(0, 1)
+        
+        tgt_mask = get_tgt_mask(observation_window)
+
+        logits = model(src, tgt_input, tgt_mask)
+
+        optimizer.zero_grad()
+
+        tgt_out = tgt[1:, :].transpose(0, 1)
+        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        loss.backward()
+
+        optimizer.step()
+        losses += loss.item()
+
+    return losses / len(list(train_dataloader))
+
+
+def evaluate(model):
+    model.eval()
+    losses = 0
+
+    for src, tgt in valid_dataloader:
+
+
+        tgt_input = tgt[:-1, :].transpose(0, 1)
+
+        tgt_mask = get_tgt_mask(observation_window)
+
+        logits = model(src, tgt_input, tgt_mask)
+
+        tgt_out = tgt[1:, :].transpose(0, 1)
+        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        losses += loss.item()
+
+    return losses / len(list(valid_dataloader))
+
+
+
+from timeit import default_timer as timer
+NUM_EPOCHS = 18
+
+for epoch in range(1, NUM_EPOCHS+1):
+    start_time = timer()
+    train_loss = train_epoch(transformer, optimizer)
+    end_time = timer()
+    val_loss = evaluate(transformer)
+    print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+
+
+# function to generate output sequence using greedy algorithm
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    src = src.to(device)
+    src_mask = src_mask.to(device)
+
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
+    for i in range(max_len-1):
+        memory = memory.to(device)
+        tgt_mask = (get_tgt_mask(ys.size(0), device)
+                    .type(torch.bool)).to(device)
+        out = model.decode(ys, memory, tgt_mask)
+        out = out.transpose(0, 1)
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.item()
+
+        ys = torch.cat([ys,
+                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
+    return ys
+
+
+# # actual function to translate input sentence into target language
+# def translate(model: torch.nn.Module, src_sentence: str):
+#     model.eval()
+#     src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
+#     num_tokens = src.shape[0]
+#     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
+#     tgt_tokens = greedy_decode(
+#         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX).flatten()
+#     return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
