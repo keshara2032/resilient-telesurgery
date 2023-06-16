@@ -18,4 +18,4 @@ for file in os.listdir(gestures_path):
             start, stop, mp = int(row['Start']), int(row['Stop']), row['MP']
             kinematics.loc[start:stop, 'label'] = mp
         kinematics = kinematics[kinematics['label'] != '-']
-        kinematics.to_csv("./new_dataset/gestures/" + file[:-3] + 'csv')
+        kinematics.to_csv("./new_dataset/gestures/" + file[:-3] + 'csv', index=False)
