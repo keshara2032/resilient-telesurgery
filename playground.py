@@ -51,23 +51,26 @@ num_output_classes = len(train_dataloader.dataset.le.classes_)
 
 # model initialization
 recognition_transformer = RecognitionModel(encoder_input_dim=num_kinematic_features,
-                                            decoder_embedding_dim=num_output_classes,
-                                              num_encoder_layers=num_decoder_layers,
-                                              num_decoder_layers=num_decoder_layers,
-                                              emb_size=emb_size,
-                                              nhead=nhead,
-                                              tgt_vocab_size=)
+                                            decoder_input_dim=num_output_classes, 
+                                            num_encoder_layers=num_decoder_layers,
+                                            num_decoder_layers=num_decoder_layers,
+                                            emb_size=emb_size,
+                                            nhead=nhead,
+                                            tgt_vocab_size=num_output_classes,
+                                            decoder_embedding_dim = -1,
+                                            dim_feedforward=ffn_hid_dim, # don't use embeddings for decoder input labels
+                                            dropout=0.1)
 for p in recognition_transformer.parameters():
     if p.dim() > 1:
         torch.nn.init.xavier_uniform_(p)
-transformer = recognition_transformer.to(device)
+recognition_transformer = recognition_transformer.to(device)
 
 # loss function
 loss_fn = torch.nn.CrossEntropyLoss()
 
 # optimizer
-optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
-schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=EMB_SIZE, n_warmup_steps=2000)
+optimizer = torch.optim.Adam(recognition_transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=emb_size, n_warmup_steps=2000)
 
 
 
@@ -82,7 +85,10 @@ def train_epoch(model, optimizer):
         tgt = tgt.transpose(0, 1)
         tgt_input = tgt[:-1, :]
         
-        tgt_mask = get_tgt_mask(observation_window)
+        tgt_mask = get_tgt_mask(observation_window, device)
+
+        print(src.shape, tgt_input.shape, tgt_mask.shape)
+
 
         logits = model(src, tgt_input, tgt_mask)
 
@@ -113,7 +119,7 @@ def evaluate(model):
         tgt = tgt.transpose(0, 1)
         tgt_input = tgt[:-1, :]
 
-        tgt_mask = get_tgt_mask(observation_window)
+        tgt_mask = get_tgt_mask(observation_window, device)
 
         logits = model(src, tgt_input, tgt_mask)
 
@@ -130,9 +136,9 @@ NUM_EPOCHS = 10
 
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()
-    train_loss = train_epoch(transformer, optimizer)
+    train_loss = train_epoch(recognition_transformer, optimizer)
     end_time = timer()
-    val_loss = evaluate(transformer)
+    val_loss = evaluate(recognition_transformer)
     print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
 

@@ -18,23 +18,25 @@ import math
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self,
-                 emb_size: int,
-                 dropout: float,
-                 maxlen: int = 5000):
+
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
-        den = torch.exp(- torch.arange(0, emb_size, 2)* math.log(10000) / emb_size)
-        pos = torch.arange(0, maxlen).reshape(maxlen, 1)
-        pos_embedding = torch.zeros((maxlen, emb_size))
-        pos_embedding[:, 0::2] = torch.sin(pos * den)
-        pos_embedding[:, 1::2] = torch.cos(pos * den)
-        pos_embedding = pos_embedding.unsqueeze(-2)
+        self.dropout = nn.Dropout(p=dropout)
 
-        self.dropout = nn.Dropout(dropout)
-        self.register_buffer('pos_embedding', pos_embedding)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        if d_model%2 != 0:
+            pe[:, 1::2] = torch.cos(position * div_term)[:,0:-1]
+        else:
+            pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
 
-    def forward(self, token_embedding: Tensor):
-        return self.dropout(token_embedding + self.pos_embedding[:token_embedding.size(0), :])
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
     
 
 class TokenEmbedding(nn.Module):
@@ -92,7 +94,7 @@ class CustomEncoder:
     def __init__(self, input_dim: int, num_encoder_layers: int, emb_size: int, nhead: int, dim_feedforward: int, dropout: float, activation):
         self.input_encoder = torch.nn.Linear(in_features=input_dim, out_features=emb_size)
         encoder_layer = TransformerEncoderLayer(d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
-        encoder_norm = LayerNorm(d_model=emb_size)
+        encoder_norm = LayerNorm(emb_size)
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
         self.activation = activation
 
@@ -122,8 +124,13 @@ class RecognitionModel(nn.Module):
         self.activation = activation
 
         # positional encoding
-        self.positional_encoding = PositionalEncoding(
-            emb_size, dropout=dropout)
+        self.encoder_positional_encoding = PositionalEncoding(
+            encoder_input_dim, dropout=dropout)
+        
+        dim = decoder_embedding_dim if decoder_embedding_dim > 0 else decoder_input_dim
+        print(dim)
+        self.decoder_positional_encoding = PositionalEncoding(
+            dim, dropout=dropout)
 
         # custom encoder
         self.encoder = CustomEncoder(encoder_input_dim, num_encoder_layers, emb_size, nhead, dim_feedforward, dropout, self.activation)
@@ -140,9 +147,7 @@ class RecognitionModel(nn.Module):
             self.tgt_tok_emb = TokenEmbedding(decoder_input_dim, decoder_embedding_dim)
             self.decoder_embedding_transform = torch.nn.Linear(decoder_embedding_dim, emb_size)
         else:
-            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)
-        self.decoder_embedding_transform = self.activation(self.decoder_embedding_transform)
-        
+            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)        
         self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
 
     def forward(self,
@@ -150,11 +155,11 @@ class RecognitionModel(nn.Module):
                 trg: Tensor,
                 tgt_mask: Tensor):
         
-        src_emb = self.positional_encoding(src) # add positional encoding to the kinematics data
-        if self.decoder_uses_embeddings:
+        src_emb = self.encoder_positional_encoding(src) # add positional encoding to the kinematics data
+        if self.decoder_embedding_dim > 0:
             trg = self.tgt_tok_emb(trg) # if using label encoding as well, encode the gesture inputs to the decoder
-            trg = self.decoder_embedding_transform(trg) # transform from decoder embedding dim to emb_size
-        tgt_emb = self.positional_encoding(trg) # add positional encoding to the targets (gestures)
+        tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
+        tgt_emb = self.decoder_embedding_transform(tgt_emb) # transform tgt to model hidden dimension (d_model = emb_size)
         outs = self.transformer(src_emb, tgt_emb, None, tgt_mask)
         return self.fc_output(outs)
 
