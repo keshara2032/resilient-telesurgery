@@ -21,8 +21,8 @@ def _get_files_except_user(data_path, user_id: int) -> List[str]:
 
 # building train and validation datasets and dataloaders
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-observation_window = 10
-prediction_window = 20
+observation_window = 30
+prediction_window = 30
 batch_size = 64
 train_files_path, valid_files_path = _get_files_except_user(data_path, 1)
 train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window)
@@ -35,20 +35,28 @@ print("datasets lengths: ", len(train_dataset), len(valid_dataset))
 print("X shape: ", train_dataset.X.shape, valid_dataset.X.shape)
 print("Y shape: ", train_dataset.Y.shape, valid_dataset.Y.shape)
 
-
 # training params
 torch.manual_seed(0)
 
-TGT_VOCAB_SIZE = len(train_dataloader.dataset.le.classes_)
-EMB_SIZE = 512
-NHEAD = 8
-FFN_HID_DIM = 512
-BATCH_SIZE = 128
-NUM_ENCODER_LAYERS = 3
-NUM_DECODER_LAYERS = 3
+
+emb_size = 64
+nhead = 1
+ffn_hid_dim = 512
+num_encoder_layers = 1
+num_decoder_layers = 1
+
+num_kinematic_features = 22
+num_output_classes = len(train_dataloader.dataset.le.classes_)
+
 
 # model initialization
-recognition_transformer = RecognitionModel()
+recognition_transformer = RecognitionModel(encoder_input_dim=num_kinematic_features,
+                                            decoder_embedding_dim=num_output_classes,
+                                              num_encoder_layers=num_decoder_layers,
+                                              num_decoder_layers=num_decoder_layers,
+                                              emb_size=emb_size,
+                                              nhead=nhead,
+                                              tgt_vocab_size=)
 for p in recognition_transformer.parameters():
     if p.dim() > 1:
         torch.nn.init.xavier_uniform_(p)
@@ -66,11 +74,13 @@ schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=EMB_SIZE, n_warmup_step
 def train_epoch(model, optimizer):
     model.train()
     losses = 0
+    running_loss = 0.0
 
     for i, (src, tgt, future) in enumerate(train_dataloader):
 
         src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
-        tgt_input = tgt[:-1, :].transpose(0, 1)
+        tgt = tgt.transpose(0, 1)
+        tgt_input = tgt[:-1, :]
         
         tgt_mask = get_tgt_mask(observation_window)
 
@@ -78,12 +88,18 @@ def train_epoch(model, optimizer):
 
         optimizer.zero_grad()
 
-        tgt_out = tgt[1:, :].transpose(0, 1)
+        tgt_out = tgt[1:, :]
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
         loss.backward()
 
         optimizer.step()
         losses += loss.item()
+
+        # printing statistics
+        running_loss += loss.item()
+        if i % 50 == 49:    # print every 50 mini-batches
+            print(f'[{i + 1:5d}] loss: {running_loss / 50:.3f}')
+            running_loss = 0.0
 
     return losses / len(list(train_dataloader))
 
@@ -91,17 +107,17 @@ def train_epoch(model, optimizer):
 def evaluate(model):
     model.eval()
     losses = 0
-
+    running_loss = 0.0
     for src, tgt in valid_dataloader:
 
-
-        tgt_input = tgt[:-1, :].transpose(0, 1)
+        tgt = tgt.transpose(0, 1)
+        tgt_input = tgt[:-1, :]
 
         tgt_mask = get_tgt_mask(observation_window)
 
         logits = model(src, tgt_input, tgt_mask)
 
-        tgt_out = tgt[1:, :].transpose(0, 1)
+        tgt_out = tgt[1:, :]
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
         losses += loss.item()
 
@@ -110,7 +126,7 @@ def evaluate(model):
 
 
 from timeit import default_timer as timer
-NUM_EPOCHS = 18
+NUM_EPOCHS = 10
 
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()

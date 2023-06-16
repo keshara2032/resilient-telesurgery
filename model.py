@@ -89,16 +89,18 @@ class ScheduledOptim():
 
 
 class CustomEncoder:
-    def __init__(self, input_dim: int, num_encoder_layers: int, emb_size: int, nhead: int, dim_feedforward: int, dropout: float):
+    def __init__(self, input_dim: int, num_encoder_layers: int, emb_size: int, nhead: int, dim_feedforward: int, dropout: float, activation):
         self.input_encoder = torch.nn.Linear(in_features=input_dim, out_features=emb_size)
         encoder_layer = TransformerEncoderLayer(d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
         encoder_norm = LayerNorm(d_model=emb_size)
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+        self.activation = activation
 
     def forward(self, x):
         x1 = self.input_encoder(x)
         x2 = self.encoder(x1)
-        return x2
+        x2_nonlinearity = self.activation(x2)
+        return x2_nonlinearity
 
 
 class RecognitionModel(nn.Module):
@@ -109,16 +111,22 @@ class RecognitionModel(nn.Module):
                  num_decoder_layers: int,
                  emb_size: int,
                  nhead: int,
-                 src_vocab_size: int,
                  tgt_vocab_size: int,
                  decoder_embedding_dim: int = -1,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+                 dropout: float = 0.1,
+                 activation=torch.nn.ReLU()):
         super(RecognitionModel, self).__init__()
 
         self.decoder_embedding_dim = decoder_embedding_dim
+        self.activation = activation
+
+        # positional encoding
+        self.positional_encoding = PositionalEncoding(
+            emb_size, dropout=dropout)
+
         # custom encoder
-        self.encoder = CustomEncoder(encoder_input_dim, num_encoder_layers, emb_size, nhead, dim_feedforward, dropout)
+        self.encoder = CustomEncoder(encoder_input_dim, num_encoder_layers, emb_size, nhead, dim_feedforward, dropout, self.activation)
         self.transformer = Transformer(d_model=emb_size,
                                        nhead=nhead,
                                        num_encoder_layers=num_encoder_layers,
@@ -127,12 +135,15 @@ class RecognitionModel(nn.Module):
                                        dropout=dropout,
                                        custom_encoder=self.encoder) # we are using a custom encoder to transform the input to emb_dize dimensions
         
-        self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
+        # decoder embeddings and transformation
         if self.decoder_embedding_dim > 0:
             self.tgt_tok_emb = TokenEmbedding(decoder_input_dim, decoder_embedding_dim)
             self.decoder_embedding_transform = torch.nn.Linear(decoder_embedding_dim, emb_size)
-        self.positional_encoding = PositionalEncoding(
-            emb_size, dropout=dropout)
+        else:
+            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)
+        self.decoder_embedding_transform = self.activation(self.decoder_embedding_transform)
+        
+        self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
 
     def forward(self,
                 src: Tensor,
