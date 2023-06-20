@@ -160,9 +160,9 @@ class RecognitionModel(nn.Module):
 
         return self.fc_output(outs)
 
-    def encode(self, src: Tensor, src_mask: Tensor):
+    def encode(self, src: Tensor, src_mask: Tensor = None):
         x = self.activation(self.encoder_input_transform(self.positional_encoding(src)))
-        return self.transformer.encoder()
+        return self.transformer.encoder(x)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         if self.decoder_embedding_dim > 0:
