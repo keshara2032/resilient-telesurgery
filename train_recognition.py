@@ -127,7 +127,7 @@ def evaluate(model):
         losses += loss.item()
 
     pred, gt = np.concatenate(pred), np.concatenate(gt)
-    report = classification_report(gt, pred, target_names=train_dataset.get_target_names(), output_dict=True)
+    report = classification_report(gt, pred, target_names=train_dataloader.dataset.get_target_names(), output_dict=True)
     print(pd.DataFrame(report).transpose())
 
     return losses / len(list(valid_dataloader))
