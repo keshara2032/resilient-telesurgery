@@ -3,9 +3,12 @@ import os
 from functools import partial
 import torch
 import numpy as np
+import pandas as pd
+from sklearn.metrics import classification_report
 
 from torch.utils.data import DataLoader
 from dataset import LOUO_Dataset
+from datagen import tasks
 
 from model import RecognitionModel, ScheduledOptim, get_tgt_mask
 
@@ -13,11 +16,12 @@ from model import RecognitionModel, ScheduledOptim, get_tgt_mask
 # cross validation files handling
 data_path = os.path.join(".", "new_dataset", "gestures")
 
-def _get_files_except_user(data_path, user_id: int) -> List[str]:
+def _get_files_except_user(task, data_path, user_id: int) -> List[str]:
+    assert(task in tasks)
     files = os.listdir(data_path)
     csv_files = [p for p in files if p.endswith(".csv")]
-    except_user = [os.path.join(data_path, p) for p in csv_files if not p.startswith(f"Peg_Transfer_S0{user_id}")]
-    user = [os.path.join(data_path, p) for p in csv_files if p.startswith(f"Peg_Transfer_S0{user_id}")]
+    except_user = [os.path.join(data_path, p) for p in csv_files if not p.startswith(f"{task}_S0{user_id}")]
+    user = [os.path.join(data_path, p) for p in csv_files if p.startswith(f"{task}_S0{user_id}")]
     return except_user, user 
 
 
@@ -26,7 +30,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 30
 prediction_window = 30
 batch_size = 64
-train_files_path, valid_files_path = _get_files_except_user(data_path, 1)
+train_files_path, valid_files_path = _get_files_except_user("", data_path, 1)
 train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=True)
 valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=True)
 
@@ -47,12 +51,12 @@ ffn_hid_dim = 512
 num_encoder_layers = 1
 num_decoder_layers = 1
 
-num_kinematic_features = 22
-num_output_classes = len(train_dataloader.dataset.le.classes_)
+num_features = len(train_dataset.get_feature_names())
+num_output_classes = len(train_dataset.get_target_names())
 
 
 # model initialization
-recognition_transformer = RecognitionModel(encoder_input_dim=num_kinematic_features,
+recognition_transformer = RecognitionModel(encoder_input_dim=num_features,
                                             decoder_input_dim=num_output_classes, 
                                             num_encoder_layers=num_decoder_layers,
                                             num_decoder_layers=num_decoder_layers,
@@ -75,14 +79,12 @@ loss_fn = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(recognition_transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
 schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=emb_size, n_warmup_steps=2000)
 
-
-
 def train_epoch(model, optimizer):
     model.train()
     losses = 0
     running_loss = 0.0
 
-    for i, (src, tgt, future) in enumerate(train_dataloader):
+    for i, (src, tgt, future_gesture, future_kinematics) in enumerate(train_dataloader):
 
         # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
         src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
@@ -117,7 +119,9 @@ def evaluate(model):
     model.eval()
     losses = 0
     running_loss = 0.0
-    for src, tgt, future in valid_dataloader:
+    pred = []
+    gt = []
+    for src, tgt, future_gesture, future_kinematics in valid_dataloader:
 
         src = src.transpose(0, 1)
         tgt = tgt.transpose(0, 1)
@@ -132,9 +136,18 @@ def evaluate(model):
         logits_reshaped = logits.reshape(-1, logits.shape[-1])
         tgt_reshaped = torch.argmax(tgt_out, dim=-1).reshape(-1)
         loss = loss_fn(logits_reshaped, tgt_reshaped)
-        accuracy = np.mean(torch.argmax(logits_reshaped, dim=-1).cpu().detach().numpy() == tgt_reshaped.cpu().numpy())
+
+        predicted_targets = torch.argmax(logits_reshaped, dim=-1).cpu().detach().numpy()
+        accuracy = np.mean(predicted_targets == tgt_reshaped.cpu().numpy())
+        pred.append(predicted_targets.reshape(-1))
+        gt.append(tgt_reshaped.cpu().numpy().reshape(-1))
+
         print(f"Valid: Accuracy for frame: {accuracy}")
         losses += loss.item()
+
+    pred, gt = np.concatenate(pred), np.concatenate(gt)
+    report = classification_report(gt, pred, target_names=train_dataset.get_target_names(), output_dict=True)
+    print(pd.DataFrame(report).transpose())
 
     return losses / len(list(valid_dataloader))
 

@@ -22,7 +22,13 @@ class LOUO_Dataset(Dataset):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         (self.X, self.Y) = self._load_data()   
         if step > 0:
-            self.X, self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)   
+            self.X, self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
+
+    def get_feature_names(self):
+        return self.feature_names
+    
+    def get_target_names(self):
+        return self.target_names
         
     def _load_data(self):
         X = []
@@ -37,10 +43,13 @@ class LOUO_Dataset(Dataset):
             
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
+
+        self.feature_names = kinematics_data.columns.to_list()[:-1]
         
         # label encoding and transformation
         self.le.fit(Y[0])
         Y = [self.le.transform(yi) for yi in Y]
+        self.target_names = self.le.classes_
 
         # one-hot encoding
         Y = [yi.reshape(len(yi), 1) for yi in Y]
@@ -60,9 +69,10 @@ class LOUO_Dataset(Dataset):
         # this should return one sample from the dataset
         features = self.X[idx + 1 : idx + self.observation_window_size + 1]
         target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
-        pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
+        gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
+        traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         
-        return features, target, pred_target
+        return features, target, gesture_pred_target, traj_pred_target
     
     @staticmethod
     def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
