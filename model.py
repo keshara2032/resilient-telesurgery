@@ -92,7 +92,7 @@ class ScheduledOptim():
 
 class CustomEncoder:
     def __init__(self, input_dim: int, num_encoder_layers: int, emb_size: int, nhead: int, dim_feedforward: int, dropout: float, activation):
-        self.input_encoder = torch.nn.Linear(in_features=input_dim, out_features=emb_size)
+        
         encoder_layer = TransformerEncoderLayer(d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
         encoder_norm = LayerNorm(emb_size)
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
@@ -107,47 +107,53 @@ class CustomEncoder:
 
 class RecognitionModel(nn.Module):
     def __init__(self,
-                 encoder_input_dim: int,
-                 decoder_input_dim: int,
+                 encoder_input_dim: int, # dimension of the input to the encoder
+                 decoder_input_dim: int, # dimension of the input to the decoder (before embedding)
                  num_encoder_layers: int,
                  num_decoder_layers: int,
                  emb_size: int,
                  nhead: int,
-                 tgt_vocab_size: int,
-                 decoder_embedding_dim: int = -1,
+                 tgt_vocab_size: int, # number of output classes
+                 max_len: int, # maximum length of the encoder input
+                 decoder_embedding_dim: int = -1, # embedding dimension for the decoder input (if > 0)
                  dim_feedforward: int = 512,
                  dropout: float = 0.1,
-                 activation=torch.nn.ReLU()):
+                 activation=torch.nn.ReLU()): # activation function of the input dim matching linear layers
         super(RecognitionModel, self).__init__()
 
+        # parameters
         self.decoder_embedding_dim = decoder_embedding_dim
         self.activation = activation
 
         # positional encoding
         self.encoder_positional_encoding = PositionalEncoding(
-            encoder_input_dim, dropout=dropout)
+            encoder_input_dim, dropout=dropout, max_len=max_len)
         
+        # encoder input transformation to model dimension
+        self.encoder_input_transform = torch.nn.Linear(in_features=encoder_input_dim, out_features=emb_size)
+        
+        # edecoder
         dim = decoder_embedding_dim if decoder_embedding_dim > 0 else decoder_input_dim
-        print(dim)
         self.decoder_positional_encoding = PositionalEncoding(
             dim, dropout=dropout)
 
         # custom encoder
-        self.encoder = CustomEncoder(encoder_input_dim, num_encoder_layers, emb_size, nhead, dim_feedforward, dropout, self.activation)
         self.transformer = Transformer(d_model=emb_size,
                                        nhead=nhead,
                                        num_encoder_layers=num_encoder_layers,
                                        num_decoder_layers=num_decoder_layers,
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout,
-                                       custom_encoder=self.encoder) # we are using a custom encoder to transform the input to emb_dize dimensions
+                                       max_len=max_len) # we are using a custom encoder to transform the input to emb_dize dimensions
         
         # decoder embeddings and transformation
         if self.decoder_embedding_dim > 0:
             self.tgt_tok_emb = TokenEmbedding(decoder_input_dim, decoder_embedding_dim)
             self.decoder_embedding_transform = torch.nn.Linear(decoder_embedding_dim, emb_size)
         else:
-            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)        
+            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)    
+
+        # output layer    
         self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
 
     def forward(self,
@@ -155,22 +161,31 @@ class RecognitionModel(nn.Module):
                 trg: Tensor,
                 tgt_mask: Tensor):
         
+        # encoder
         src_emb = self.encoder_positional_encoding(src) # add positional encoding to the kinematics data
+        src_emb = self.encoder_input_transform(src_emb)
+
+        # decoder
         if self.decoder_embedding_dim > 0:
             trg = self.tgt_tok_emb(trg) # if using label encoding as well, encode the gesture inputs to the decoder
         tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
         tgt_emb = self.decoder_embedding_transform(tgt_emb) # transform tgt to model hidden dimension (d_model = emb_size)
+
+        # output
         outs = self.transformer(src_emb, tgt_emb, None, tgt_mask)
+
         return self.fc_output(outs)
 
     def encode(self, src: Tensor, src_mask: Tensor):
-        return self.transformer.encoder(self.positional_encoding(
-                            src))
+        return self.transformer.encoder(self.encoder_input_transform(self.positional_encoding(src)))
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
-        return self.transformer.decoder(self.positional_encoding(
-                          self.tgt_tok_emb(tgt)), memory,
-                          tgt_mask)
+        if self.decoder_embedding_dim > 0:
+            x = self.tgt_tok_emb(tgt)
+        else:
+            x = tgt
+        x = self.decoder_embedding_transform(self.tgt_tok_emb(tgt))
+        return self.transformer.decoder(x, memory, tgt_mask)
     
 
 def get_tgt_mask(window_size, device):
