@@ -10,12 +10,15 @@ import numpy as np
 
 class LOUO_Dataset(Dataset):
     
-    def __init__(self, files_path: List[str], observation_window_size: int, prediction_window_size: int, step: int = 0):
+    def __init__(self, files_path: List[str], observation_window_size: int, prediction_window_size: int, step: int = 0, onehot = False):
         
         self.files_path = files_path
         self.observation_window_size = observation_window_size
         self.prediction_window_size = prediction_window_size
         self.le = preprocessing.LabelEncoder()
+        self.onehot = onehot
+        if onehot:
+            self.enc = preprocessing.OneHotEncoder(sparse_output=False)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         (self.X, self.Y) = self._load_data()   
         if step > 0:
@@ -38,6 +41,10 @@ class LOUO_Dataset(Dataset):
         # label encoding and transformation
         self.le.fit(Y[0])
         Y = [self.le.transform(yi) for yi in Y]
+
+        # one-hot encoding
+        Y = [yi.reshape(len(yi), 1) for yi in Y]
+        Y = [self.enc.fit_transform(yi) for yi in Y]
         
         # store data inside a single 2D numpy array
         X = np.concatenate(X)

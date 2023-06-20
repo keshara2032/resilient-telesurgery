@@ -2,6 +2,8 @@ from typing import List
 import os
 from functools import partial
 import torch
+import numpy as np
+
 from torch.utils.data import DataLoader
 from dataset import LOUO_Dataset
 
@@ -25,11 +27,11 @@ observation_window = 30
 prediction_window = 30
 batch_size = 64
 train_files_path, valid_files_path = _get_files_except_user(data_path, 1)
-train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window)
-valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window)
+train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=True)
+valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=True)
 
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device))
-valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device))
+valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device), drop_last=True)
 
 print("datasets lengths: ", len(train_dataset), len(valid_dataset))
 print("X shape: ", train_dataset.X.shape, valid_dataset.X.shape)
@@ -39,7 +41,7 @@ print("Y shape: ", train_dataset.Y.shape, valid_dataset.Y.shape)
 torch.manual_seed(0)
 
 
-emb_size = 64
+emb_size = 128
 nhead = 1
 ffn_hid_dim = 512
 num_encoder_layers = 1
@@ -57,6 +59,7 @@ recognition_transformer = RecognitionModel(encoder_input_dim=num_kinematic_featu
                                             emb_size=emb_size,
                                             nhead=nhead,
                                             tgt_vocab_size=num_output_classes,
+                                            max_len = observation_window,
                                             decoder_embedding_dim = -1,
                                             dim_feedforward=ffn_hid_dim, # don't use embeddings for decoder input labels
                                             dropout=0.1)
@@ -81,21 +84,21 @@ def train_epoch(model, optimizer):
 
     for i, (src, tgt, future) in enumerate(train_dataloader):
 
+        # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
         src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
         tgt = tgt.transpose(0, 1)
         tgt_input = tgt[:-1, :]
         
+        # get the target mask
         tgt_mask = get_tgt_mask(observation_window, device)
 
-        print(src.shape, tgt_input.shape, tgt_mask.shape)
-
-
+        # model outputs
         logits = model(src, tgt_input, tgt_mask)
 
         optimizer.zero_grad()
 
         tgt_out = tgt[1:, :]
-        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), torch.argmax(tgt_out, dim=-1).reshape(-1))
         loss.backward()
 
         optimizer.step()
@@ -114,8 +117,9 @@ def evaluate(model):
     model.eval()
     losses = 0
     running_loss = 0.0
-    for src, tgt in valid_dataloader:
+    for src, tgt, future in valid_dataloader:
 
+        src = src.transpose(0, 1)
         tgt = tgt.transpose(0, 1)
         tgt_input = tgt[:-1, :]
 
@@ -124,7 +128,12 @@ def evaluate(model):
         logits = model(src, tgt_input, tgt_mask)
 
         tgt_out = tgt[1:, :]
-        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+
+        logits_reshaped = logits.reshape(-1, logits.shape[-1])
+        tgt_reshaped = torch.argmax(tgt_out, dim=-1).reshape(-1)
+        loss = loss_fn(logits_reshaped, tgt_reshaped)
+        accuracy = np.mean(torch.argmax(logits_reshaped, dim=-1).cpu().detach().numpy() == tgt_reshaped.cpu().numpy())
+        print(f"Valid: Accuracy for frame: {accuracy}")
         losses += loss.item()
 
     return losses / len(list(valid_dataloader))
