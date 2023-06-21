@@ -65,7 +65,7 @@ def train_epoch(model, optimizer):
     losses = 0
     running_loss = 0.0
 
-    for i, (src, tgt, future_gesture, future_kinematics) in enumerate(train_dataloader):
+    for i, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(train_dataloader):
 
         # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
         src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
