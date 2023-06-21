@@ -9,6 +9,7 @@ import cv2
 from torchvision.io import read_video
 
 
+image_features = np.random.randn(480, 720, 3)
 
 class LOUO_Dataset(Dataset):
     
@@ -74,7 +75,6 @@ class LOUO_Dataset(Dataset):
         # this should return one sample from the dataset
         kinematic_features = self.X[idx + 1 : idx + self.observation_window_size + 1]
         # image_features = self.read_window(idx)
-        image_features = np.random.randn(480, 720, 3)
         target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
         gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
@@ -101,17 +101,17 @@ class LOUO_Dataset(Dataset):
     @staticmethod
     def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         X = []
-        X_image = []
+        # X_image = []
         Y = []
         Future_Y = []
         P = []
         for x, xi, y, yy, p in batch:
             X.append(x)
-            X_image.append(xi)
+            # X_image.append(xi)
             Y.append(y)
             Future_Y.append(yy)
             P.append(p)
-        X_image = np.array(X_image)
+        # X_image = np.array(X_image)
         X = np.array(X)
         Y = np.array(Y)
         Future_Y = np.array(Future_Y)
