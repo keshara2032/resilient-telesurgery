@@ -60,8 +60,8 @@ class LOUO_Dataset(Dataset):
         else:
             X = _X
             Y = _Y
-        X = torch.from_numpy(X).to(self.device) # shape [num_windows, window_size, features_dim]
-        Y = torch.from_numpy(Y).to(self.device)
+        X = torch.from_numpy(X).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
+        Y = torch.from_numpy(Y).to(torch.float32).to(self.device)
         return X, Y
 
         
@@ -80,7 +80,6 @@ class LOUO_Dataset(Dataset):
 
                 X_image.append(pd.DataFrame({'file_name': [video_path]*len(kin_data), 'frame_number': np.arange(len(kin_data))}))
                 X.append(kin_data.values)
-                print(kin_data.shape[0])
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
 

@@ -2,6 +2,7 @@ from typing import List
 import os
 from functools import partial
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 from dataset import get_dataloaders
 
 from model import RecognitionModel, ScheduledOptim, get_tgt_mask
+from utils import get_classification_report, visualize_gesture_ts
 
 
 
@@ -18,23 +20,25 @@ task = "Peg_Transfer"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 30
 prediction_window = 30
-batch_size = 64
-train_dataloader, valid_dataloader = get_dataloaders(task, 1, observation_window, prediction_window, batch_size)
+batch_size = 16
+user_left_out = 1
+train_dataloader, valid_dataloader = get_dataloaders(task, user_left_out, observation_window, prediction_window, batch_size)
 
 print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
 print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
 
 
-# Train Params
+# Model Params
 torch.manual_seed(0)
-emb_size = 128
+emb_size = 32
 nhead = 1
 ffn_hid_dim = 512
 num_encoder_layers = 1
 num_decoder_layers = 1
 num_features = len(train_dataloader.dataset.get_feature_names())
 num_output_classes = len(train_dataloader.dataset.get_target_names())
+max_len = train_dataloader.dataset.get_max_len()
 
 
 # model initialization
@@ -45,7 +49,7 @@ recognition_transformer = RecognitionModel(encoder_input_dim=num_features,
                                             emb_size=emb_size,
                                             nhead=nhead,
                                             tgt_vocab_size=num_output_classes,
-                                            max_len = observation_window,
+                                            max_len = max_len,
                                             decoder_embedding_dim = -1,
                                             dim_feedforward=ffn_hid_dim, # don't use embeddings for decoder input labels
                                             dropout=0.1)
@@ -103,7 +107,7 @@ def evaluate(model):
     running_loss = 0.0
     pred = []
     gt = []
-    for src, tgt, future_gesture, future_kinematics in valid_dataloader:
+    for src, src_image, tgt, future_gesture, future_kinematics in valid_dataloader:
 
         src = src.transpose(0, 1)
         tgt = tgt.transpose(0, 1)
@@ -128,15 +132,14 @@ def evaluate(model):
         losses += loss.item()
 
     pred, gt = np.concatenate(pred), np.concatenate(gt)
-    report = classification_report(gt, pred, target_names=train_dataloader.dataset.get_target_names(), output_dict=True)
-    print(pd.DataFrame(report).transpose())
+    print(get_classification_report(pred, gt, train_dataloader.dataset.get_target_names()))
 
     return losses / len(list(valid_dataloader))
 
 
 
 from timeit import default_timer as timer
-NUM_EPOCHS = 10
+NUM_EPOCHS = 1
 
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()
@@ -147,33 +150,26 @@ for epoch in range(1, NUM_EPOCHS+1):
 
 
 # function to generate output sequence using greedy algorithm
-def greedy_decode(model, src, src_mask, max_len, start_symbol):
-    src = src.to(device)
-    src_mask = src_mask.to(device)
+def greedy_decode(model, src, max_len, start_symbol, num_classes):
 
-    memory = model.encode(src, src_mask)
-    ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
-    for i in range(max_len-1):
-        memory = memory.to(device)
-        tgt_mask = (get_tgt_mask(ys.size(0), device)
-                    .type(torch.bool)).to(device)
+    model.eval()
+    
+    ys = torch.ones(1).fill_(start_symbol)
+    ys = F.one_hot(ys.to(torch.int64), num_classes)
+    print(src.shape, ys.shape)
+    memory = model.encode(src)
+    
+    for _ in range(max_len-1):
+        tgt_mask = (get_tgt_mask(ys.size(0), device).type(torch.bool))
         out = model.decode(ys, memory, tgt_mask)
         out = out.transpose(0, 1)
-        prob = model.generator(out[:, -1])
+        prob = model.fc_output(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.item()
-
-        ys = torch.cat([ys,
-                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
+        new_y = F.one_hot(torch.ones(1).type_as(src.data).fill_(next_word), num_classes)
+        ys = torch.cat([ys, new_y], dim=0)
     return ys
 
-
-# # actual function to translate input sentence into target language
-# def translate(model: torch.nn.Module, src_sentence: str):
-#     model.eval()
-#     src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
-#     num_tokens = src.shape[0]
-#     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-#     tgt_tokens = greedy_decode(
-#         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX).flatten()
-#     return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
+X_trial, Y_trial = valid_dataloader.dataset.get_trial(0)
+initial_symbol = torch.argmax(Y_trial[0])
+pred = greedy_decode(recognition_transformer, X_trial, X_trial.shape[0], torch.argmax(Y_trial[0]), len(valid_dataloader.dataset.get_target_names()))
