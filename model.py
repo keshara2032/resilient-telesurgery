@@ -117,7 +117,7 @@ class RecognitionModel(nn.Module):
         # edecoder
         dim = decoder_embedding_dim if decoder_embedding_dim > 0 else decoder_input_dim
         self.decoder_positional_encoding = PositionalEncoding(
-            dim, dropout=dropout)
+            dim, dropout=dropout, max_len=max_len)
 
         # custom encoder
         self.transformer = Transformer(d_model=emb_size,
@@ -161,7 +161,7 @@ class RecognitionModel(nn.Module):
         return self.fc_output(outs)
 
     def encode(self, src: Tensor, src_mask: Tensor = None):
-        x = self.activation(self.encoder_input_transform(self.positional_encoding(src)))
+        x = self.activation(self.encoder_input_transform(self.encoder_positional_encoding(src)))
         return self.transformer.encoder(x)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
@@ -169,7 +169,7 @@ class RecognitionModel(nn.Module):
             x = self.tgt_tok_emb(tgt)
         else:
             x = tgt
-        x = self.decoder_embedding_transform(self.tgt_tok_emb(tgt))
+        x = self.decoder_embedding_transform(x)
         x = self.activation(x)
         return self.transformer.decoder(x, memory, tgt_mask)
     
