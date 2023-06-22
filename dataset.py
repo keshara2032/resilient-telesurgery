@@ -23,6 +23,7 @@ class LOUO_Dataset(Dataset):
         if onehot:
             self.enc = preprocessing.OneHotEncoder(sparse_output=False)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.step = step
         (self.X, self.X_image, self.Y) = self._load_data()   
         if step > 0:
             self.X, self.X_image, self.Y = self.X[::step], self.X_image[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
@@ -32,11 +33,43 @@ class LOUO_Dataset(Dataset):
     
     def get_target_names(self):
         return self.target_names
+    
+    def get_num_trials(self):
+        return len(self.samples_per_trial)
+    
+    def get_max_len(self):
+        return self.max_len
+    
+    def get_trial(self, trial_id: int, window_size: int = -1):
+        if trial_id == 0:
+            trial_start = 0
+        else:
+            trial_start = sum(self.samples_per_trial[:trial_id])
+        trial_end = trial_start + self.samples_per_trial[trial_id]
+        _X = self.X[trial_start:trial_end]
+        _Y = self.Y[trial_start:trial_end]
+        if window_size > 0:
+            X = []
+            Y = []
+            num_windows = _X.shape[0]//window_size
+            for i in range(num_windows):
+                X.append(_X[i*window_size:(i+1)*window_size])
+                Y.append(_Y[i*window_size:(i+1)*window_size])
+            X = np.array(X)
+            Y = np.array(Y)
+        else:
+            X = _X
+            Y = _Y
+        X = torch.from_numpy(X).to(self.device) # shape [num_windows, window_size, features_dim]
+        Y = torch.from_numpy(Y).to(self.device)
+        return X, Y
+
         
     def _load_data(self):
         X = []
         X_image = []
         Y = []
+        self.samples_per_trial = []
         
         for kinematics_path, video_path in self.files_path:
             if os.path.isfile(kinematics_path) and kinematics_path.endswith('.csv'):
@@ -47,9 +80,12 @@ class LOUO_Dataset(Dataset):
 
                 X_image.append(pd.DataFrame({'file_name': [video_path]*len(kin_data), 'frame_number': np.arange(len(kin_data))}))
                 X.append(kin_data.values)
+                print(kin_data.shape[0])
                 Y.append(kin_label.values)
+                self.samples_per_trial.append(len(kin_data))
 
         self.feature_names = kinematics_data.columns.to_list()[:-1]
+        self.max_len = max([d.shape[0] for d in X])
         
         # label encoding and transformation
         self.le.fit(Y[0])
