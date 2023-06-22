@@ -25,6 +25,7 @@ print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
 print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
 
+
 # Train Params
 torch.manual_seed(0)
 emb_size = 128
