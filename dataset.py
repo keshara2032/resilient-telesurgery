@@ -1,4 +1,5 @@
 from typing import List
+from functools import partial
 import torch
 import os
 from sklearn import preprocessing
@@ -46,8 +47,8 @@ class LOUO_Dataset(Dataset):
         else:
             trial_start = sum(self.samples_per_trial[:trial_id])
         trial_end = trial_start + self.samples_per_trial[trial_id]
-        _X = self.X[trial_start:trial_end]
-        _Y = self.Y[trial_start:trial_end]
+        _X = self.X[trial_start + 1 : trial_end + 1]
+        _Y = self.Y[trial_start : trial_end + 1]
         if window_size > 0:
             X = []
             Y = []
@@ -61,7 +62,8 @@ class LOUO_Dataset(Dataset):
             X = _X
             Y = _Y
         X = torch.from_numpy(X).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
-        Y = torch.from_numpy(Y).to(torch.float32).to(self.device)
+        target_type = target_type = torch.float32 if self.onehot else torch.long
+        Y = torch.from_numpy(Y).to(target_type).to(self.device)
         return X, Y
 
         
@@ -87,13 +89,16 @@ class LOUO_Dataset(Dataset):
         self.max_len = max([d.shape[0] for d in X])
         
         # label encoding and transformation
-        self.le.fit(Y[0])
+        self.le.fit(np.concatenate(Y))
         Y = [self.le.transform(yi) for yi in Y]
         self.target_names = self.le.classes_
+        print(self.target_names)
 
         # one-hot encoding
-        Y = [yi.reshape(len(yi), 1) for yi in Y]
-        Y = [self.enc.fit_transform(yi) for yi in Y]
+        if self.onehot:
+            Y = [yi.reshape(len(yi), 1) for yi in Y]
+            self.enc.fit(np.concatenate(Y, axis=0))
+            Y = [self.enc.transform(yi) for yi in Y]
         
         # store data inside a single 2D numpy array
         X_image = pd.concat(X_image, axis=0)
@@ -134,7 +139,7 @@ class LOUO_Dataset(Dataset):
 
     
     @staticmethod
-    def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), target_type=torch.float32):
         X = []
         # X_image = []
         Y = []
@@ -160,8 +165,8 @@ class LOUO_Dataset(Dataset):
         
         x_batch = x_batch.to(torch.float32)
         # xi_batch = xi_batch.to(torch.float32)
-        y_batch = y_batch.to(torch.float32)
-        yy_batch = yy_batch.to(torch.float32)
+        y_batch = y_batch.to(target_type)
+        yy_batch = yy_batch.to(target_type)
         p_batch = p_batch.to(torch.float32)
 
         x_batch = x_batch.to(device)
@@ -177,7 +182,8 @@ def get_dataloaders(task: str,
                     subject_id_to_exclude: str,
                     observation_window: int,
                     prediction_window: int,
-                    batch_size: int):
+                    batch_size: int,
+                    one_hot: bool):
     
     from typing import List
     import os
@@ -206,10 +212,11 @@ def get_dataloaders(task: str,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data_path = os.path.join("ProcessedDatasets", task)
     train_files_path, valid_files_path = _get_files_except_user(task, data_path, subject_id_to_exclude)
-    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=True)
-    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=True)
+    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot)
+    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot)
 
-    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device))
-    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device)) 
+    target_type = torch.float32 if one_hot else torch.long
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type))
+    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type)) 
 
     return train_dataloader, valid_dataloader                  

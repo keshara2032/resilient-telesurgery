@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 import torch.optim as optim
 from torch import Tensor
-from torch.nn import Transformer
+from torch.nn import Transformer, TransformerEncoder, TransformerEncoderLayer
 import math
 
 
@@ -113,26 +113,7 @@ class RecognitionModel(nn.Module):
         
         # encoder input transformation to model dimension
         self.encoder_input_transform = torch.nn.Linear(in_features=encoder_input_dim, out_features=emb_size)
-        
-        # edecoder
-        dim = decoder_embedding_dim if decoder_embedding_dim > 0 else decoder_input_dim
-        self.decoder_positional_encoding = PositionalEncoding(
-            dim, dropout=dropout, max_len=max_len)
-
-        # custom encoder
-        self.transformer = Transformer(d_model=emb_size,
-                                       nhead=nhead,
-                                       num_encoder_layers=num_encoder_layers,
-                                       num_decoder_layers=num_decoder_layers,
-                                       dim_feedforward=dim_feedforward,
-                                       dropout=dropout)
-        
-        # decoder embeddings and transformation
-        if self.decoder_embedding_dim > 0:
-            self.tgt_tok_emb = TokenEmbedding(decoder_input_dim, decoder_embedding_dim)
-            self.decoder_embedding_transform = torch.nn.Linear(decoder_embedding_dim, emb_size)
-        else:
-            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)    
+         
 
         # output layer    
         self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
@@ -150,8 +131,7 @@ class RecognitionModel(nn.Module):
         # decoder
         if self.decoder_embedding_dim > 0:
             trg = self.tgt_tok_emb(trg) # if using label encoding as well, encode the gesture inputs to the decoder
-        # tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
-        tgt_emb = trg
+        tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
         tgt_emb = self.decoder_embedding_transform(tgt_emb) # transform tgt to model hidden dimension (d_model = emb_size)
         tgt_emb = self.activation(tgt_emb)
 
@@ -169,9 +149,59 @@ class RecognitionModel(nn.Module):
             x = self.tgt_tok_emb(tgt)
         else:
             x = tgt
-        x = self.decoder_embedding_transform(x)
+        x = self.decoder_embedding_transform(self.decoder_positional_encoding(x))
         x = self.activation(x)
         return self.transformer.decoder(x, memory, tgt_mask)
+    
+
+class DirectRecognitionModel(nn.Module):
+    def __init__(self,
+                 encoder_input_dim: int, # dimension of the input to the encoder
+                 num_encoder_layers: int,
+                 emb_size: int,
+                 nhead: int,
+                 tgt_vocab_size: int, # number of output classes
+                 max_len: int, # maximum length of the encoder input
+                 dim_feedforward: int = 512,
+                 dropout: float = 0.1,
+                 activation=torch.nn.ReLU()): # activation function of the input dim matching linear layers
+        super(DirectRecognitionModel, self).__init__()
+
+        # parameters
+        self.activation = activation
+
+        # positional encoding
+        self.encoder_positional_encoding = PositionalEncoding(
+            encoder_input_dim, dropout=dropout, max_len=max_len)
+        
+        # encoder input transformation to model dimension
+        self.encoder_input_transform = torch.nn.Linear(in_features=encoder_input_dim, out_features=emb_size)
+
+        # encoder
+        encoder_layers = nn.TransformerEncoderLayer(
+            d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout
+        )
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layers, num_layers=num_encoder_layers
+        )
+
+        # output layer    
+        self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
+
+    def forward(self, src: Tensor):
+        
+        # src transformation
+        src_emb = self.encoder_positional_encoding(src) # add positional encoding to the kinematics data
+        src_emb = self.encoder_input_transform(src_emb)
+        src_emb = self.activation(src_emb)
+
+        # encoder
+        encoded = self.transformer_encoder(src_emb)
+
+        # output
+        out = self.fc_output(encoded)
+
+        return out
     
 
 def get_tgt_mask(window_size, device):
