@@ -113,7 +113,26 @@ class RecognitionModel(nn.Module):
         
         # encoder input transformation to model dimension
         self.encoder_input_transform = torch.nn.Linear(in_features=encoder_input_dim, out_features=emb_size)
-         
+        
+        # edecoder
+        dim = decoder_embedding_dim if decoder_embedding_dim > 0 else decoder_input_dim
+        self.decoder_positional_encoding = PositionalEncoding(
+            dim, dropout=dropout, max_len=max_len)
+
+        # custom encoder
+        self.transformer = Transformer(d_model=emb_size,
+                                       nhead=nhead,
+                                       num_encoder_layers=num_encoder_layers,
+                                       num_decoder_layers=num_decoder_layers,
+                                       dim_feedforward=dim_feedforward,
+                                       dropout=dropout)
+        
+        # decoder embeddings and transformation
+        if self.decoder_embedding_dim > 0:
+            self.tgt_tok_emb = TokenEmbedding(decoder_input_dim, decoder_embedding_dim)
+            self.decoder_embedding_transform = torch.nn.Linear(decoder_embedding_dim, emb_size)
+        else:
+            self.decoder_embedding_transform = torch.nn.Linear(decoder_input_dim, emb_size)    
 
         # output layer    
         self.fc_output = nn.Linear(emb_size, tgt_vocab_size)
@@ -131,12 +150,13 @@ class RecognitionModel(nn.Module):
         # decoder
         if self.decoder_embedding_dim > 0:
             trg = self.tgt_tok_emb(trg) # if using label encoding as well, encode the gesture inputs to the decoder
-        tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
+        # tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
+        tgt_emb = trg
         tgt_emb = self.decoder_embedding_transform(tgt_emb) # transform tgt to model hidden dimension (d_model = emb_size)
         tgt_emb = self.activation(tgt_emb)
 
         # output
-        outs = self.transformer(src_emb, tgt_emb, None, tgt_mask)
+        outs = self.transformer(src=src_emb, tgt=tgt_emb, src_mask=None, tgt_mask=tgt_mask)
 
         return self.fc_output(outs)
 
@@ -149,10 +169,10 @@ class RecognitionModel(nn.Module):
             x = self.tgt_tok_emb(tgt)
         else:
             x = tgt
-        x = self.decoder_embedding_transform(self.decoder_positional_encoding(x))
+        x = self.decoder_embedding_transform(x)
         x = self.activation(x)
         return self.transformer.decoder(x, memory, tgt_mask)
-    
+
 
 class DirectRecognitionModel(nn.Module):
     def __init__(self,
