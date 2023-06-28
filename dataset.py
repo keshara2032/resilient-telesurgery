@@ -14,11 +14,12 @@ image_features = np.random.randn(480, 720, 3)
 
 class LOUO_Dataset(Dataset):
     
-    def __init__(self, files_path: List[str], observation_window_size: int, prediction_window_size: int, step: int = 0, onehot = False):
+    def __init__(self, files_path: List[str], observation_window_size: int, prediction_window_size: int, step: int = 0, onehot = False, class_names = []):
         
         self.files_path = files_path
         self.observation_window_size = observation_window_size
         self.prediction_window_size = prediction_window_size
+        self.target_names = class_names
         self.le = preprocessing.LabelEncoder()
         self.onehot = onehot
         if onehot:
@@ -89,16 +90,22 @@ class LOUO_Dataset(Dataset):
         self.max_len = max([d.shape[0] for d in X])
         
         # label encoding and transformation
-        self.le.fit(np.concatenate(Y))
-        Y = [self.le.transform(yi) for yi in Y]
+        if not self.target_names:
+            self.le.fit(np.concatenate(Y))
+        else:
+            self.le.fit(np.array(self.target_names))
         self.target_names = self.le.classes_
         print(self.target_names)
+        Y = [self.le.transform(yi) for yi in Y]
+        print(Y[0])
 
         # one-hot encoding
         if self.onehot:
+            self.enc.fit(np.arange(len(self.target_names)).reshape(-1, 1))
             Y = [yi.reshape(len(yi), 1) for yi in Y]
-            self.enc.fit(np.concatenate(Y, axis=0))
             Y = [self.enc.transform(yi) for yi in Y]
+        print(Y[0])
+        
         
         # store data inside a single 2D numpy array
         X_image = pd.concat(X_image, axis=0)
@@ -178,45 +185,4 @@ class LOUO_Dataset(Dataset):
         return (x_batch, None, y_batch, yy_batch, p_batch)
 
 
-def get_dataloaders(task: str,
-                    subject_id_to_exclude: str,
-                    observation_window: int,
-                    prediction_window: int,
-                    batch_size: int,
-                    one_hot: bool):
-    
-    from typing import List
-    import os
-    from functools import partial
-    import torch
-
-    from torch.utils.data import DataLoader
-    from dataset import LOUO_Dataset
-    from datagen import tasks
-    
-
-    def _get_files_except_user(task, data_path, subject_id_to_exclude: int) -> List[str]:
-        assert(task in tasks)
-        files = os.listdir(data_path)
-        csv_files = [p for p in files if p.endswith(".csv")]
-        with open(os.path.join(data_path, "video_files.txt"), 'r') as fp:
-            video_files = fp.read().strip().split('\n')
-        csv_files.sort(key = lambda x: os.path.basename(x)[:-4])
-        video_files.sort(key = lambda x: os.path.basename(x)[:-4])
-        except_user = [(os.path.join(data_path, p), v) for (p, v) in zip(csv_files, video_files) if not p.startswith(f"{task}_S0{subject_id_to_exclude}")]
-        user = [(os.path.join(data_path, p), v) for (p, v) in zip(csv_files, video_files) if p.startswith(f"{task}_S0{subject_id_to_exclude}")]
-        return except_user, user 
-
-
-    # building train and validation datasets and dataloaders
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data_path = os.path.join("ProcessedDatasets", task)
-    train_files_path, valid_files_path = _get_files_except_user(task, data_path, subject_id_to_exclude)
-    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot)
-    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot)
-
-    target_type = torch.float32 if one_hot else torch.long
-    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type))
-    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type)) 
-
-    return train_dataloader, valid_dataloader                  
+                
