@@ -155,7 +155,7 @@ class LOUO_Dataset(Dataset):
 
     
     @staticmethod
-    def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), target_type=torch.float32):
+    def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), target_type=torch.float32, cast: bool = True):
         X = []
         # X_image = []
         Y = []
@@ -173,23 +173,33 @@ class LOUO_Dataset(Dataset):
         Future_Y = np.array(Future_Y)
         P = np.array(P)
 
-        x_batch = torch.from_numpy(X)
-        # xi_batch = torch.from_numpy(X_image)
-        y_batch = torch.from_numpy(Y)
-        yy_batch = torch.from_numpy(Future_Y)
-        p_batch = torch.from_numpy(P)
-        
-        x_batch = x_batch.to(torch.float32)
-        # xi_batch = xi_batch.to(torch.float32)
-        y_batch = y_batch.to(target_type)
-        yy_batch = yy_batch.to(target_type)
-        p_batch = p_batch.to(torch.float32)
+        if cast:
+            # cast to torch tensor
+            x_batch = torch.from_numpy(X)
+            # xi_batch = torch.from_numpy(X_image)
+            y_batch = torch.from_numpy(Y)
+            yy_batch = torch.from_numpy(Future_Y)
+            p_batch = torch.from_numpy(P)
+            
+            # cast to appropriate data type
+            x_batch = x_batch.to(torch.float32)
+            # xi_batch = xi_batch.to(torch.float32)
+            y_batch = y_batch.to(target_type)
+            yy_batch = yy_batch.to(target_type)
+            p_batch = p_batch.to(torch.float32)
 
-        x_batch = x_batch.to(device)
-        # xi_batch = xi_batch.to(device)
-        y_batch = y_batch.to(device)
-        yy_batch = yy_batch.to(device)
-        p_batch = p_batch.to(device)
+            # cast to appropriate device
+            x_batch = x_batch.to(device)
+            # xi_batch = xi_batch.to(device)
+            y_batch = y_batch.to(device)
+            yy_batch = yy_batch.to(device)
+            p_batch = p_batch.to(device)
+        else:
+            x_batch = X
+            # xi_batch = X_image
+            y_batch = Y
+            yy_batch = Future_Y
+            p_batch = P
 
         return (x_batch, None, y_batch, yy_batch, p_batch)
 

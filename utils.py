@@ -79,7 +79,8 @@ def get_dataloaders(tasks: List[str],
                     batch_size: int,
                     one_hot: bool,
                     class_names: List[str],
-                    feature_names: List[str]):
+                    feature_names: List[str],
+                    cast: bool):
     
     from typing import List
     import os
@@ -116,8 +117,8 @@ def get_dataloaders(tasks: List[str],
     valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names)
 
     target_type = torch.float32 if one_hot else torch.long
-    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type))
-    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type)) 
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast))
+    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast)) 
 
     return train_dataloader, valid_dataloader  
 
