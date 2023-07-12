@@ -50,7 +50,7 @@ def generate_data(task: str):
 
 if __name__ == "__main__":
     task = sys.argv[1]
-    assert(task in tasks)
+    assert(task in all_tasks)
     generate_data(task)
 
 

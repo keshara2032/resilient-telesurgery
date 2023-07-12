@@ -29,20 +29,23 @@ feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
             "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z", \
             "PSMR_orientation_x", "PSMR_orientation_y", "PSMR_orientation_z", "PSMR_orientation_w", \
             "PSMR_gripper_angle"]
+
 one_hot = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 30
 prediction_window = 40
 batch_size = 64
 user_left_out = 2
+cast = True
 train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      user_left_out,
                                                      observation_window,
                                                      prediction_window,
                                                      batch_size,
                                                      one_hot,
-                                                     class_names=all_class_names,
-                                                     feature_names=feature_names)
+                                                     class_names = all_class_names,
+                                                     feature_names = feature_names,
+                                                     cast = cast)
 
 print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
@@ -57,8 +60,7 @@ print("Train N Trials: ", train_dataloader.dataset.get_num_trials())
 print("Train Max Length: ", train_dataloader.dataset.get_max_len())
 print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
 print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
-print(train_dataloader.dataset.get_feature_names())
-exit()
+print("Features: ", train_dataloader.dataset.get_feature_names())
 
 # Model Params
 torch.manual_seed(0)
