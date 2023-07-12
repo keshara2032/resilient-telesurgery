@@ -6,12 +6,13 @@ import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
+from timeit import default_timer as timer
 from model import RecognitionModel, DirectRecognitionModel, ScheduledOptim, get_tgt_mask
 from utils import get_classification_report, visualize_gesture_ts, get_dataloaders
 
 
 
-# Data Params
+# Data Params -------------------------------------------------------------------------------------------------
 tasks = ["Needle_Passing", "Suturing", "Knot_Tying"]
 class_names = {
     "Peg_Transfer": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
@@ -62,7 +63,7 @@ print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
 print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
 print("Features: ", train_dataloader.dataset.get_feature_names())
 
-# Model Params
+# Model Params and Initialization -------------------------------------------------------------------------------------------------
 torch.manual_seed(0)
 emb_size = 64
 nhead = 4
@@ -75,7 +76,6 @@ num_output_classes = len(train_dataloader.dataset.get_target_names())
 max_len = observation_window
 
 
-# model initialization
 # recognition_transformer = RecognitionModel(encoder_input_dim=num_features,
 #                                             decoder_input_dim=num_output_classes, 
 #                                             num_encoder_layers=num_decoder_layers,
@@ -102,14 +102,16 @@ for p in recognition_transformer.parameters():
     if p.dim() > 1:
         torch.nn.init.xavier_uniform_(p)
 
-# loss function
+# loss function -------------------------------------------------------------------------------------------------
 loss_fn = torch.nn.CrossEntropyLoss()
 
-# optimizer
+# optimizer -------------------------------------------------------------------------------------------------
 optimizer = torch.optim.Adam(recognition_transformer.parameters(), lr=2e-5, betas=(0.9, 0.98), eps=1e-9)
 schd_optim = ScheduledOptim(optimizer, lr_mul=1, d_model=emb_size, n_warmup_steps=2000)
 
-def train_epoch(model, optimizer):
+
+# Train / Validation Loops -------------------------------------------------------------------------------------------------
+def train_epoch(model, optimizer, train_dataloader):
     model.train()
     losses = 0
     running_loss = 0.0
@@ -150,7 +152,7 @@ def train_epoch(model, optimizer):
     return losses / len(list(train_dataloader))
 
 
-def evaluate(model):
+def evaluate(model, valid_dataloader):
     model.eval()
     losses = 0
     running_loss = 0.0
@@ -192,8 +194,37 @@ def evaluate(model):
     pred, gt = np.concatenate(pred), np.concatenate(gt)
     print(get_classification_report(pred, gt, train_dataloader.dataset.get_target_names()))
     print(f"Evaluation accuracy: {accuracy/n_batches}")
-    return losses / len(list(valid_dataloader))
+    return losses / len(list(valid_dataloader)), accuracy/n_batches
 
+def cross_validation(model, optimizer, users: List[int], epochs: int):
+    losses, accuracies = list(), list()
+    for user in users:
+        train_dataloader, valid_dataloader = get_dataloaders(
+            tasks,
+            user,
+            observation_window,
+            prediction_window,
+            batch_size,
+            one_hot,
+            class_names = all_class_names,
+            feature_names = feature_names,
+            cast = cast)
+        for epoch in range(1, epochs+1):
+            start_time = timer()
+            train_loss = train_epoch(model, optimizer, train_dataloader)
+            end_time = timer()
+            val_loss, val_accuracy = evaluate(model, valid_dataloader)
+            losses.append(val_loss)
+            accuracies.append(val_accuracy)
+            print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+    # save the model
+
+    # return the main metric
+    return np.mean(losses), np.mean(accuracies)
+
+mean_cv_loss, mean_cv_accuracy = cross_validation(recognition_transformer, optimizer, [2, 3, 4, 5, 6, 8, 9], 3)
+print(mean_cv_loss, mean_cv_accuracy)
+exit()
 
 
 from timeit import default_timer as timer
@@ -244,3 +275,12 @@ print(torch.argmax(pred, dim=-1).view(-1))
 # print(torch.argmax(pred2, dim=-1).view(-1))
 # print(torch.argmax(Y_trial, dim=1))
 # print(torch.mean((torch.argmax(pred, dim=-1).view(-1) == torch.argmax(Y_trial, dim=1)).to(torch.float32)))
+
+
+
+
+
+def get_optimal_params():
+    # build an objective based on the cross validation metric
+    # search over the hyper parameters, find the optimal one and save it
+    pass
