@@ -14,12 +14,20 @@ image_features = np.random.randn(480, 720, 3)
 
 class LOUO_Dataset(Dataset):
     
-    def __init__(self, files_path: List[str], observation_window_size: int, prediction_window_size: int, step: int = 0, onehot = False, class_names = []):
+    def __init__(self,
+                files_path: List[str],
+                observation_window_size: int,
+                prediction_window_size: int,
+                step: int = 0,
+                onehot = False,
+                class_names = [],
+                feature_names = []):
         
         self.files_path = files_path
         self.observation_window_size = observation_window_size
         self.prediction_window_size = prediction_window_size
         self.target_names = class_names
+        self.feature_names = feature_names
         self.le = preprocessing.LabelEncoder()
         self.onehot = onehot
         if onehot:
@@ -78,15 +86,16 @@ class LOUO_Dataset(Dataset):
             if os.path.isfile(kinematics_path) and kinematics_path.endswith('.csv'):
                 kinematics_data = pd.read_csv(kinematics_path)
 
-                kin_data = kinematics_data.iloc[:,:-1]
-                kin_label = kinematics_data.iloc[:,-1]
+                feature_names = kinematics_data.columns.to_list()[:-1] if not self.feature_names else self.feature_names
+                kin_data = kinematics_data.loc[:, feature_names]
+                kin_label = kinematics_data.iloc[:,-1] # last column is always taken to be the target class
 
                 X_image.append(pd.DataFrame({'file_name': [video_path]*len(kin_data), 'frame_number': np.arange(len(kin_data))}))
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
 
-        self.feature_names = kinematics_data.columns.to_list()[:-1]
+        
         self.max_len = max([d.shape[0] for d in X])
         
         # label encoding and transformation
