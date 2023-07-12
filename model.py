@@ -145,7 +145,8 @@ class RecognitionModel(nn.Module):
         # encoder
         src_emb = self.encoder_positional_encoding(src) # add positional encoding to the kinematics data
         src_emb = self.encoder_input_transform(src_emb)
-        src_emb = self.activation(src_emb)
+        if self.activation:
+            src_emb = self.activation(src_emb)
 
         # decoder
         if self.decoder_embedding_dim > 0:
@@ -153,7 +154,8 @@ class RecognitionModel(nn.Module):
         # tgt_emb = self.decoder_positional_encoding(trg) # add positional encoding to the targets (gestures)
         tgt_emb = trg
         tgt_emb = self.decoder_embedding_transform(tgt_emb) # transform tgt to model hidden dimension (d_model = emb_size)
-        tgt_emb = self.activation(tgt_emb)
+        if self.activation:
+            tgt_emb = self.activation(tgt_emb)
 
         # output
         outs = self.transformer(src=src_emb, tgt=tgt_emb, src_mask=None, tgt_mask=tgt_mask)
@@ -161,7 +163,9 @@ class RecognitionModel(nn.Module):
         return self.fc_output(outs)
 
     def encode(self, src: Tensor, src_mask: Tensor = None):
-        x = self.activation(self.encoder_input_transform(self.encoder_positional_encoding(src)))
+        x = self.encoder_input_transform(self.encoder_positional_encoding(src))
+        if self.activation:
+            x = self.activation(x)
         return self.transformer.encoder(x)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
@@ -170,7 +174,8 @@ class RecognitionModel(nn.Module):
         else:
             x = tgt
         x = self.decoder_embedding_transform(x)
-        x = self.activation(x)
+        if self.activation:
+            x = self.activation(x)
         return self.transformer.decoder(x, memory, tgt_mask)
 
 

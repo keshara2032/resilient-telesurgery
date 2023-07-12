@@ -121,6 +121,3 @@ def get_dataloaders(tasks: List[str],
     valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast)) 
 
     return train_dataloader, valid_dataloader  
-
-def get_all_jigsaws_data():
-    pass
