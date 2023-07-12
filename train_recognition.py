@@ -12,13 +12,14 @@ from utils import get_classification_report, visualize_gesture_ts, get_dataloade
 
 
 # Data Params
-task = "Needle_Passing"
+tasks = ["Needle_Passing", "Suturing", "Knot_Tying"]
 class_names = {
     "Peg_Transfer": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
     "Suturing": ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11'],
     "Knot_Tyring": ['G1', 'G11', 'G12', 'G13', 'G14', 'G15'],
     "Needle_Passing": ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11']
 }
+all_class_names = ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15']
 
 feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
             "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z", \
@@ -31,23 +32,24 @@ feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
 one_hot = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 30
-prediction_window = 30
+prediction_window = 40
 batch_size = 64
 user_left_out = 2
-train_dataloader, valid_dataloader = get_dataloaders(task,
+train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      user_left_out,
                                                      observation_window,
                                                      prediction_window,
                                                      batch_size,
                                                      one_hot,
-                                                     class_names=class_names[task],
+                                                     class_names=all_class_names,
                                                      feature_names=feature_names)
 
 print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
 print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
 
-print("Obs Kinematics Shape: ", train_dataloader.dataset[0][0].shape) # src, src_image, tgt, future_gesture, future_kinematics
+# loader generator aragement: (src, src_image, tgt, future_gesture, future_kinematics)
+print("Obs Kinematics Shape: ", train_dataloader.dataset[0][0].shape) 
 print("Obs Target Shape: ", train_dataloader.dataset[0][2].shape)
 print("Future Target Shape: ", train_dataloader.dataset[0][3].shape)
 print("Future Kinematics Shape: ", train_dataloader.dataset[0][4].shape)

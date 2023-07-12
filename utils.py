@@ -72,7 +72,7 @@ def visualize_gesture_ts(pred, gt, target_names):
     plt.scatter(np.arange(pred.shape[0]), gt, c='blue')
     plt.show()
 
-def get_dataloaders(task: str,
+def get_dataloaders(tasks: List[str],
                     subject_id_to_exclude: str,
                     observation_window: int,
                     prediction_window: int,
@@ -88,11 +88,11 @@ def get_dataloaders(task: str,
 
     from torch.utils.data import DataLoader
     from dataset import LOUO_Dataset
-    from datagen import tasks
+    from datagen import all_tasks
     
 
     def _get_files_except_user(task, data_path, subject_id_to_exclude: int) -> List[str]:
-        assert(task in tasks)
+        assert(task in all_tasks)
         files = os.listdir(data_path)
         csv_files = [p for p in files if p.endswith(".csv")]
         with open(os.path.join(data_path, "video_files.txt"), 'r') as fp:
@@ -106,10 +106,12 @@ def get_dataloaders(task: str,
 
     # building train and validation datasets and dataloaders
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data_path = os.path.join("ProcessedDatasets", task)
-    train_files_path, valid_files_path = _get_files_except_user(task, data_path, subject_id_to_exclude)
-    print("Train: ", train_files_path)
-    print("Valid: ", valid_files_path)
+    train_files_path, valid_files_path = list(), list()
+    for task in tasks:
+        data_path = os.path.join("ProcessedDatasets", task)
+        tp, vp = _get_files_except_user(task, data_path, subject_id_to_exclude)
+        train_files_path += tp
+        valid_files_path += vp
     train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names)
     valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names)
 
