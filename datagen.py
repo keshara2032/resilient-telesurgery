@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import sys
 
-tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing", "Pea_on_a_Peg", "Post_and_Sleeve"]
+all_tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing", "Pea_on_a_Peg", "Post_and_Sleeve"]
 
 def generate_data(task: str):
     processed_data_path = "./ProcessedDatasets"
