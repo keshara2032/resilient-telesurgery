@@ -222,7 +222,7 @@ def cross_validation(model, optimizer, users: List[int], epochs: int):
     # return the main metric
     return np.mean(losses), np.mean(accuracies)
 
-mean_cv_loss, mean_cv_accuracy = cross_validation(recognition_transformer, optimizer, [2, 3, 4, 5, 6, 8, 9], 3)
+mean_cv_loss, mean_cv_accuracy = cross_validation(recognition_transformer, optimizer, [2, 3, 4, 5, 6, 8, 9], 2)
 print(mean_cv_loss, mean_cv_accuracy)
 exit()
 

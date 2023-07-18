@@ -218,7 +218,8 @@ class DirectRecognitionModel(nn.Module):
         # src transformation
         src_emb = self.encoder_positional_encoding(src) # add positional encoding to the kinematics data
         src_emb = self.encoder_input_transform(src_emb)
-        src_emb = self.activation(src_emb)
+        if self.activation:
+            src_emb = self.activation(src_emb)
 
         # encoder
         encoded = self.transformer_encoder(src_emb)
