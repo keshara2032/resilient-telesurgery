@@ -9,27 +9,13 @@ from sklearn.metrics import classification_report
 from timeit import default_timer as timer
 from model import RecognitionModel, DirectRecognitionModel, ScheduledOptim, get_tgt_mask
 from utils import get_classification_report, visualize_gesture_ts, get_dataloaders
+from datagen import feature_names, class_names, all_class_names, state_variables
 
 
 
 # Data Params -------------------------------------------------------------------------------------------------
 tasks = ["Needle_Passing", "Suturing", "Knot_Tying"]
-class_names = {
-    "Peg_Transfer": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
-    "Suturing": ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11'],
-    "Knot_Tyring": ['G1', 'G11', 'G12', 'G13', 'G14', 'G15'],
-    "Needle_Passing": ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11']
-}
-all_class_names = ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15']
-
-feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
-            "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z", \
-            "PSML_orientation_x", "PSML_orientation_y", "PSML_orientation_z", "PSML_orientation_w", \
-            "PSML_gripper_angle", \
-            "PSMR_position_x", "PSMR_position_y", "PSMR_position_z", \
-            "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z", \
-            "PSMR_orientation_x", "PSMR_orientation_y", "PSMR_orientation_z", "PSMR_orientation_w", \
-            "PSMR_gripper_angle"]
+Features = feature_names+state_variables
 
 one_hot = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,7 +31,7 @@ train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      batch_size,
                                                      one_hot,
                                                      class_names = all_class_names,
-                                                     feature_names = feature_names,
+                                                     feature_names = Features,
                                                      cast = cast)
 
 print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
@@ -74,6 +60,7 @@ decoder_embedding_dim = 8
 num_features = len(train_dataloader.dataset.get_feature_names())
 num_output_classes = len(train_dataloader.dataset.get_target_names())
 max_len = observation_window
+print(num_features)
 
 
 # recognition_transformer = RecognitionModel(encoder_input_dim=num_features,
@@ -207,7 +194,7 @@ def cross_validation(model, optimizer, users: List[int], epochs: int):
             batch_size,
             one_hot,
             class_names = all_class_names,
-            feature_names = feature_names,
+            feature_names = Features,
             cast = cast)
         for epoch in range(1, epochs+1):
             start_time = timer()
