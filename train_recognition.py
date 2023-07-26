@@ -15,7 +15,7 @@ from datagen import feature_names, class_names, all_class_names, state_variables
 
 # Data Params -------------------------------------------------------------------------------------------------
 tasks = ["Needle_Passing", "Suturing", "Knot_Tying"]
-Features = feature_names+state_variables
+Features = feature_names + state_variables #kinematic features + state variable features
 
 one_hot = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

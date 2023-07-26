@@ -113,7 +113,7 @@ class LOUO_Dataset(Dataset):
             self.enc.fit(np.arange(len(self.target_names)).reshape(-1, 1))
             Y = [yi.reshape(len(yi), 1) for yi in Y]
             Y = [self.enc.transform(yi) for yi in Y]
-        print(Y[0])
+            print(Y[0])
         
         
         # store data inside a single 2D numpy array
