@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
 from timeit import default_timer as timer
-from model import RecognitionModel, DirectRecognitionModel, ScheduledOptim, get_tgt_mask
+from models import *
+from models.utils import get_tgt_mask
 from utils import get_classification_report, visualize_gesture_ts, get_dataloaders
 from datagen import feature_names, class_names, all_class_names, state_variables
 
@@ -76,7 +77,7 @@ print(num_features)
 #                                             dropout=0.1,
 #                                             activation=torch.nn.GELU())
 
-recognition_transformer = DirectRecognitionModel(encoder_input_dim=num_features,
+recognition_transformer = DirectTransformerRecognitionModel(encoder_input_dim=num_features,
                                             num_encoder_layers=num_decoder_layers,
                                             emb_size=emb_size,
                                             nhead=nhead,
