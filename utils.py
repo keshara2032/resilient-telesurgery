@@ -1,7 +1,6 @@
 from typing import List
 import numpy as np
 import pandas as pd
-from sklearn.metrics import classification_report
 import altair as alt
 from altair_saver import save
 import altair_viewer
@@ -9,11 +8,6 @@ import matplotlib.pyplot as plt
 
 from dataset import LOUO_Dataset
 
-
-def get_classification_report(pred, gt, target_names):
-    labels=np.arange(0,len(target_names),1)
-    report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
-    return pd.DataFrame(report).transpose()
 
 def visualize_gesture_ts(pred, gt, target_names):
 

@@ -90,7 +90,7 @@ class Trainer:
         with torch.no_grad():
             # eval
             losses, nums = zip(*[
-                (model.loss(src.to(device), tgt.to(device)), len(src))
+                (model.loss(src.to(device), tgt[:, 1:].to(device)), len(src))
                 for src, src_image, tgt, future_gesture, future_kinematics in tqdm(dataloader, desc=desc)])
             losses = [l.item() for l in losses]
             return np.sum(np.multiply(losses, nums)) / np.sum(nums)
@@ -126,7 +126,7 @@ class Trainer:
 
         # loss
         loss_path = os.path.join(model_dir, "loss.csv")
-        losses = pd.read_csv(loss_path).values.tolist() if args['recovery'] and os.path.exists(loss_path) else []
+        losses    = pd.read_csv(loss_path).values.tolist() if args['recovery'] and os.path.exists(loss_path) else []
 
         model.to(device)
 
@@ -140,7 +140,7 @@ class Trainer:
             for bi, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
                 model.zero_grad()
 
-                loss = model.loss(src, tgt)
+                loss = model.loss(src, tgt[:, 1:])
                 loss.backward()
                 optimizer.step()
                 # print("{:2d}/{} loss: {:5.2f}, val_loss: {:5.2f}".format(
@@ -149,6 +149,7 @@ class Trainer:
 
             # evaluation
             val_loss = self.__eval_model(model, device, dataloader=valid_dataloader, desc="eval").item()
+            self._compute_metrics(valid_dataloader, model)
             # save losses
             losses[-1][-1] = val_loss
             self.__save_loss(losses, loss_path)
@@ -159,3 +160,16 @@ class Trainer:
                 model_path = os.path.join(model_dir, 'model.pth')
                 self.__save_model(model_path, model)
                 print("save model(epoch: {}) => {}".format(epoch, loss_path))
+
+    def _compute_metrics(self, valid_dataloader, model):
+        pred, gt = list(), list()
+        for bi, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
+            scores, tag_seq = model.forward(src)
+            tags = np.array(tag_seq).reshape(-1)
+            gt_tags = tgt[:, 1:].reshape(-1).cpu()
+            gt.append(gt_tags)
+            pred.append(tags)
+        pred, gt = np.concatenate(pred), np.concatenate(gt)
+        print('pred: ', pred)
+        print('gt: ', gt)
+        print(get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names()))

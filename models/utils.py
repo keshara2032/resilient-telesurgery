@@ -4,6 +4,9 @@ import torch
 from torch import Tensor
 from torch.nn import Transformer
 import torch.nn as nn
+from sklearn.metrics import classification_report
+import numpy as np
+import pandas as pd
 
 
 
@@ -81,3 +84,8 @@ class ScheduledOptim():
 
 def get_tgt_mask(window_size, device):
     return Transformer.generate_square_subsequent_mask(window_size, device)
+
+def get_classification_report(pred, gt, target_names):
+    labels=np.arange(0,len(target_names),1)
+    report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
+    return pd.DataFrame(report).transpose()
