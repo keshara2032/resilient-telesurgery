@@ -1,0 +1,75 @@
+from typing import List
+import os
+from functools import partial
+import torch
+import torch.nn.functional as F
+import numpy as np
+import pandas as pd
+from timeit import default_timer as timer
+from utils import get_dataloaders
+from datagen import feature_names, class_names, all_class_names, state_variables
+
+
+
+### -------------------------- DATA -----------------------------------------------------
+tasks = ["Needle_Passing", "Suturing", "Knot_Tying"]
+Features = feature_names + state_variables #kinematic features + state variable features
+
+one_hot = False
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+observation_window = 30
+prediction_window = 40
+batch_size = 64
+user_left_out = 2
+cast = True
+train_dataloader, valid_dataloader = get_dataloaders(tasks,
+                                                     user_left_out,
+                                                     observation_window,
+                                                     prediction_window,
+                                                     batch_size,
+                                                     one_hot,
+                                                     class_names = all_class_names,
+                                                     feature_names = Features,
+                                                     cast = cast)
+
+print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
+print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
+print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
+
+# loader generator aragement: (src, src_image, tgt, future_gesture, future_kinematics)
+print("Obs Kinematics Shape: ", train_dataloader.dataset[0][0].shape) 
+print("Obs Target Shape: ", train_dataloader.dataset[0][2].shape)
+print("Future Target Shape: ", train_dataloader.dataset[0][3].shape)
+print("Future Kinematics Shape: ", train_dataloader.dataset[0][4].shape)
+print("Train N Trials: ", train_dataloader.dataset.get_num_trials())
+print("Train Max Length: ", train_dataloader.dataset.get_max_len())
+print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
+print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
+print("Features: ", train_dataloader.dataset.get_feature_names())
+
+
+
+
+
+
+### -------------------------- Model -----------------------------------------------------
+from models.recognition_direct_rnn import DirectRNNRecognitionModel, Trainer
+
+args = dict(
+    hidden_dim = 256,
+    num_rnn_layers = 1,
+    rnn = 'lstm',
+    emb_dim = 64,
+    dropout = 0.1,
+    lr = 1e-3,
+    save_best_val_model = True,
+    recovery = False
+)
+epochs = 5
+model_dir = 'saved_model_files'
+
+trainer = Trainer()
+trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
+
+
+

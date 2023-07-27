@@ -8,7 +8,7 @@ import pandas as pd
 from sklearn.metrics import classification_report
 from timeit import default_timer as timer
 from models import *
-from models.utils import get_tgt_mask
+from models.utils import get_tgt_mask, ScheduledOptim
 from utils import get_classification_report, visualize_gesture_ts, get_dataloaders
 from datagen import feature_names, class_names, all_class_names, state_variables
 
