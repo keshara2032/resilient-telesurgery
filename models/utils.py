@@ -89,3 +89,14 @@ def get_classification_report(pred, gt, target_names):
     labels=np.arange(0,len(target_names),1)
     report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
     return pd.DataFrame(report).transpose()
+
+def merge_gesture_sequence(seq):
+    import itertools
+    merged_seq = list()
+    for g, _ in itertools.groupby(seq): merged_seq.append(g)
+    return merged_seq
+
+def compute_edit_score(gt, pred):
+    import editdistance
+    max_len = max(len(gt), len(pred))
+    return 1.0 - editdistance.eval(gt, pred)/max_len

@@ -53,22 +53,25 @@ print("Features: ", train_dataloader.dataset.get_feature_names())
 
 
 ### -------------------------- Model -----------------------------------------------------
-from models.recognition_direct_rnn import DirectRNNRecognitionModel, Trainer
+from models.recognition_direct_crf import Trainer as CRF_Trainer
 
 args = dict(
-    hidden_dim = 256,
-    num_rnn_layers = 1,
-    rnn = 'lstm',
-    emb_dim = 64,
+    hidden_dim = 128, # the hidden size of the rnn or transformer-encoder
+    num_layers = 2, # number of rnn or transformer-encoder layer
+    encoder_type = 'transformer',
+    emb_dim = 64, # not used with transformer
     dropout = 0.1,
-    lr = 1e-3,
+    lr = 2e-5,
     save_best_val_model = True,
-    recovery = False
+    recovery = False,
+    nhead = 4, # not used with rnn
+    max_len = observation_window, # not used with rnn
+    dim_feedforward = 1024 # not used with rnn
 )
 epochs = 5
 model_dir = 'saved_model_files'
 
-trainer = Trainer()
+trainer = CRF_Trainer()
 trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
 
 
