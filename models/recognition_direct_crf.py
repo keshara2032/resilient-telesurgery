@@ -14,37 +14,57 @@ from .utils import *
 
     
 
-class DirectRNNRecognitionModel(nn.Module):
+class DirectCRFRecognitionModel(nn.Module):
     def __init__(self,
                  input_dim: int, # dimension of the input to the encoder
-                 hidden_dim: int,
-                 num_rnn_layers: int,
+                 hidden_dim: int, # the hidden dimension of the 
+                 num_layers: int,
                  vocab_size: int, # number of output classes
-                 rnn: str, # rnn type, either lstm or gru
+                 encoder_type: str, # encoder type, either `lstm` or `gru` for an rnn encoder or `transformer`
+                 nhead: int = None, 
+                 max_len: int = None, # maximum length of the encoder input
+                 dim_feedforward: int = None,
                  emb_dim: int = -1, # input transformation dim
                  dropout: float = 0.0): # activation function of the input dim matching linear layers
-        super(DirectRNNRecognitionModel, self).__init__()
+        super(DirectCRFRecognitionModel, self).__init__()
 
         # parameters
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.num_rnn_layers = num_rnn_layers
+        self.num_layers = num_layers
         self.vocab_size = vocab_size
         self.emb_dim = emb_dim
 
-        # encoder input transformation to model dimension
-        if emb_dim:
-            self.encoder_input_transform = torch.nn.Linear(in_features=input_dim, out_features=emb_dim)
+        if encoder_type in ['lstm', 'gru']:
+            # encoder input transformation to model dimension
+            if emb_dim:
+                self.encoder_input_transform = torch.nn.Linear(in_features=input_dim, out_features=emb_dim)
+            else:
+                self.emb_dim = input_dim
+            # rnn encoder
+            RNN = nn.LSTM if encoder_type == "lstm" else nn.GRU
+            self.encoder = RNN(self.emb_dim, hidden_dim // 2, num_layers=num_layers,
+                        bidirectional=True, batch_first=True, dropout=dropout)
+            self.encoder_type = 'rnn'
+
+        
+        elif encoder_type == 'transformer':
+            # positional encoding
+            self.encoder_positional_encoding = PositionalEncoding(
+                input_dim, dropout=dropout, max_len=max_len)
+            self.encoder_input_transform = torch.nn.Linear(in_features=input_dim, out_features=hidden_dim)
+            encoder_layers = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=nhead,
+                             dim_feedforward=dim_feedforward, dropout=dropout)
+            self.encoder = nn.TransformerEncoder(
+                encoder_layers, num_layers=num_layers
+            )
+            self.encoder_type = 'transformer'
+
         else:
-            self.emb_dim = input_dim
+            raise ValueError("The encoder_type argument must be chosen from [lstm, gru, transformer]")
 
         # dropout
         self.dropout = nn.Dropout(p=dropout)
-
-        # lstm encoder
-        RNN = nn.LSTM if rnn == "lstm" else nn.GRU
-        self.rnn = RNN(self.emb_dim, hidden_dim // 2, num_layers=num_rnn_layers,
-                       bidirectional=True, batch_first=True, dropout=dropout)
         self.crf = CRF(hidden_dim, self.vocab_size)
 
     def __build_features(self, sentences):
@@ -61,13 +81,27 @@ class DirectRNNRecognitionModel(nn.Module):
         # _, unperm_idx = perm_idx.sort()
         # lstm_out = lstm_out[unperm_idx, :]
 
-        if self.emb_dim:
-            sentences = self.encoder_input_transform(sentences)
-        sentences = self.dropout(sentences)
-        lstm_out, _ = self.rnn(sentences)
+        if self.encoder_type == 'rnn':
+            if self.emb_dim:
+                sentences = self.encoder_input_transform(sentences)
+            sentences = self.dropout(sentences)
+            encoder_out, _ = self.rnn(sentences)
+        else:
+            sentences = sentences.transpose(0, 1) # batch first to seq first
+            # src transformation
+            src_emb = self.encoder_positional_encoding(sentences) # add positional encoding to the kinematics data
+            src_emb = self.encoder_input_transform(src_emb)
+
+            # encoder
+            encoder_out = self.encoder(src_emb)
+
+            # transpose the transformer-encoder input and output bach to batch-first
+            encoder_out = encoder_out.transpose(0, 1) # seq first to batch first
+            sentences = sentences.transpose(0, 1) # seq first to batch first
+
         masks = torch.ones_like(sentences[:, :, 0])
 
-        return lstm_out, masks
+        return encoder_out, masks
 
     def loss(self, xs, tags):
         features, masks = self.__build_features(xs)
@@ -110,16 +144,22 @@ class Trainer:
         input_dim = len(train_dataloader.dataset.get_feature_names())
         vocab_dim = len(train_dataloader.dataset.get_target_names())
         hidden_dim = args['hidden_dim']
-        num_rnn_layers = args['num_rnn_layers']
-        rnn = args['rnn']
+        num_layers = args['num_layers']
+        encoder_type = args['encoder_type']
         emb_dim = args['emb_dim']
         dropout = args['dropout']
-        model = DirectRNNRecognitionModel(
+        nhead = args.get('nhead', None)
+        dim_feedforward = args.get('dim_feedforward', None)
+        max_len = args.get('max_len', None)
+        model = DirectCRFRecognitionModel(
             input_dim,
             hidden_dim,
-            num_rnn_layers,
+            num_layers,
             vocab_dim,
-            rnn,
+            encoder_type,
+            nhead,
+            max_len,
+            dim_feedforward,
             emb_dim,
             dropout
         )
@@ -164,11 +204,14 @@ class Trainer:
     def _compute_metrics(self, valid_dataloader, model):
         pred, gt = list(), list()
         for bi, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
-            scores, tag_seq = model.forward(src)
+
+            _, tag_seq = model.forward(src)
             tags = np.array(tag_seq).reshape(-1)
+            pred.append(tags)
+
             gt_tags = tgt[:, 1:].reshape(-1).cpu()
             gt.append(gt_tags)
-            pred.append(tags)
+
         pred, gt = np.concatenate(pred), np.concatenate(gt)
         print('pred: ', pred)
         print('gt: ', gt)
