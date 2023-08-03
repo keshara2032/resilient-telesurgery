@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
 from timeit import default_timer as timer
-from models import *
+from models.recognition_direct_transformer import DirectTransformerRecognitionModel
 from models.utils import get_tgt_mask, ScheduledOptim
-from utils import get_classification_report, visualize_gesture_ts, get_dataloaders
+from utils import visualize_gesture_ts, get_dataloaders
+from models.utils import get_classification_report
 from datagen import feature_names, class_names, all_class_names, state_variables
 
 
@@ -170,7 +171,7 @@ def evaluate(model, valid_dataloader):
         loss = loss_fn(logits_reshaped, tgt_comp)
 
         predicted_targets = torch.argmax(logits_reshaped, dim=-1).cpu().detach().numpy()
-        accuracy += np.mean(predicted_targets == tgt_reshaped.cpu().numpy())
+        # accuracy += np.mean(predicted_targets == tgt_reshaped.cpu().numpy())
         # print("predictions: ", predicted_targets)
         # print("ground truth: ", tgt_reshaped.cpu().numpy())
         pred.append(predicted_targets.reshape(-1))
@@ -182,7 +183,7 @@ def evaluate(model, valid_dataloader):
     pred, gt = np.concatenate(pred), np.concatenate(gt)
     print(get_classification_report(pred, gt, train_dataloader.dataset.get_target_names()))
     print(f"Evaluation accuracy: {accuracy/n_batches}")
-    return losses / len(list(valid_dataloader)), accuracy/n_batches
+    return losses / len(list(valid_dataloader)), np.mean(pred == gt)
 
 def cross_validation(model, optimizer, users: List[int], epochs: int):
     losses, accuracies = list(), list()
@@ -210,9 +211,9 @@ def cross_validation(model, optimizer, users: List[int], epochs: int):
     # return the main metric
     return np.mean(losses), np.mean(accuracies)
 
-mean_cv_loss, mean_cv_accuracy = cross_validation(recognition_transformer, optimizer, [2, 3, 4, 5, 6, 8, 9], 2)
-print(mean_cv_loss, mean_cv_accuracy)
-exit()
+# mean_cv_loss, mean_cv_accuracy = cross_validation(recognition_transformer, optimizer, [2, 3, 4, 5, 6, 8, 9], 2)
+# print(mean_cv_loss, mean_cv_accuracy)
+# exit()
 
 
 from timeit import default_timer as timer
@@ -220,10 +221,10 @@ NUM_EPOCHS = 10
 
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()
-    train_loss = train_epoch(recognition_transformer, optimizer)
+    train_loss = train_epoch(recognition_transformer, optimizer, train_dataloader)
     end_time = timer()
-    val_loss = evaluate(recognition_transformer)
-    print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+    val_loss, val_accuracy = evaluate(recognition_transformer, valid_dataloader)
+    print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, val accuracy: {val_accuracy:.3f} "f"Epoch time = {(end_time - start_time):.3f}s"))
 
 
 # function to generate output sequence using greedy algorithm

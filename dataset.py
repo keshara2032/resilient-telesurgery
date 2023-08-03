@@ -1,16 +1,12 @@
 from typing import List
-from functools import partial
 import torch
 import os
 from sklearn import preprocessing
 from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
-import cv2
-from torchvision.io import read_video
 
 
-image_features = np.random.randn(480, 720, 3)
 
 class LOUO_Dataset(Dataset):
     
@@ -90,12 +86,11 @@ class LOUO_Dataset(Dataset):
                 kin_data = kinematics_data.loc[:, feature_names]
                 kin_label = kinematics_data.iloc[:,-1] # last column is always taken to be the target class
 
-                X_image.append(pd.DataFrame({'file_name': [video_path]*len(kin_data), 'frame_number': np.arange(len(kin_data))}))
+                X_image.append(np.load(video_path))
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
 
-        
         self.max_len = max([d.shape[0] for d in X])
         
         # label encoding and transformation
@@ -117,7 +112,7 @@ class LOUO_Dataset(Dataset):
         
         
         # store data inside a single 2D numpy array
-        X_image = pd.concat(X_image, axis=0)
+        X_image = np.concatenate(X_image)
         X = np.concatenate(X)
         Y = np.concatenate(Y)
 
@@ -130,44 +125,28 @@ class LOUO_Dataset(Dataset):
     def __getitem__(self, idx):
         # this should return one sample from the dataset
         kinematic_features = self.X[idx + 1 : idx + self.observation_window_size + 1]
-        # image_features = self.read_window(idx)
+        image_features = self.X_image[idx + 1 : idx + self.observation_window_size + 1]
         target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
         gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         
         return kinematic_features, image_features, target, gesture_pred_target, traj_pred_target
-    
-    def read_window(self, start_idx: int):
-        video_frames = self.X_image.iloc[start_idx + 1 : start_idx + self.observation_window_size + 1]
-        image_arrays = []
-        prev_file_name = video_frames.iloc[0]['file_name']
-        cap = cv2.VideoCapture(prev_file_name)
-        for _, row in video_frames.iterrows():
-            file_name, frame_number = row['file_name'], row['frame_number']
-            if file_name != prev_file_name:
-                cap = cv2.VideoCapture(file_name)
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number-1)
-            res, frame = cap.read()
-            image_arrays.append(frame)
-            prev_file_name = file_name
-        image_arrays = np.array(image_arrays)
-        return image_arrays
 
     
     @staticmethod
     def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), target_type=torch.float32, cast: bool = True):
         X = []
-        # X_image = []
+        X_image = []
         Y = []
         Future_Y = []
         P = []
         for x, xi, y, yy, p in batch:
             X.append(x)
-            # X_image.append(xi)
+            X_image.append(xi)
             Y.append(y)
             Future_Y.append(yy)
             P.append(p)
-        # X_image = np.array(X_image)
+        X_image = np.array(X_image)
         X = np.array(X)
         Y = np.array(Y)
         Future_Y = np.array(Future_Y)
@@ -176,32 +155,32 @@ class LOUO_Dataset(Dataset):
         if cast:
             # cast to torch tensor
             x_batch = torch.from_numpy(X)
-            # xi_batch = torch.from_numpy(X_image)
+            xi_batch = torch.from_numpy(X_image)
             y_batch = torch.from_numpy(Y)
             yy_batch = torch.from_numpy(Future_Y)
             p_batch = torch.from_numpy(P)
             
             # cast to appropriate data type
             x_batch = x_batch.to(torch.float32)
-            # xi_batch = xi_batch.to(torch.float32)
+            xi_batch = xi_batch.to(torch.float32)
             y_batch = y_batch.to(target_type)
             yy_batch = yy_batch.to(target_type)
             p_batch = p_batch.to(torch.float32)
 
             # cast to appropriate device
             x_batch = x_batch.to(device)
-            # xi_batch = xi_batch.to(device)
+            xi_batch = xi_batch.to(device)
             y_batch = y_batch.to(device)
             yy_batch = yy_batch.to(device)
             p_batch = p_batch.to(device)
         else:
             x_batch = X
-            # xi_batch = X_image
+            xi_batch = X_image
             y_batch = Y
             yy_batch = Future_Y
             p_batch = P
 
-        return (x_batch, None, y_batch, yy_batch, p_batch)
+        return (x_batch, xi_batch, y_batch, yy_batch, p_batch)
 
 
                 

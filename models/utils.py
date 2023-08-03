@@ -7,6 +7,7 @@ import torch.nn as nn
 from sklearn.metrics import classification_report
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 
@@ -82,12 +83,63 @@ class ScheduledOptim():
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
 
+def plot_sequences_as_horizontal_bar(sequence1, sequence2):
+    colors = colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black', 'white', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive']
+    unique_numbers1 = sorted(set(sequence1))
+    unique_numbers2 = sorted(set(sequence2))
+    all_unique_numbers = sorted(set(unique_numbers1 + unique_numbers2))
+
+    color_map = {num: color for num, color in zip(all_unique_numbers, colors)}
+
+    def plot_sequence(sequence, offset):
+        current_number = sequence[0]
+        start_idx = 0
+        spans = []
+
+        for i, num in enumerate(sequence):
+            if num != current_number:
+                spans.append((start_idx, i - 1, current_number))
+                start_idx = i
+                current_number = num
+
+        # Add the last span
+        spans.append((start_idx, len(sequence) - 1, current_number))
+
+        for i, (start, end, num) in enumerate(spans):
+            color = color_map[num]
+            plt.barh(offset, end - start + 1, left=start, height=0.5, color=color, edgecolor='black')
+            # plt.text(start + (end - start + 1) / 2, offset, str(num), ha='center', va='center', color='white', fontsize=12)
+
+    plt.figure(figsize=(10, 4))
+    plt.yticks([])
+    plot_sequence(sequence1, 0)
+    plot_sequence(sequence2, 1)
+
+    plt.xlabel('Sequence Index')
+    plt.title('Horizontal Bar Plot of Sequences')
+    plt.show()
+
 def get_tgt_mask(window_size, device):
     return Transformer.generate_square_subsequent_mask(window_size, device)
 
 def get_classification_report(pred, gt, target_names):
-    labels=np.arange(0,len(target_names),1)
+
+    # get the classification report
+    labels=np.arange(0, len(target_names) ,1)
     report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
+
+    # plot computation matrix
+    # from sklearn import metrics
+    # import matplotlib.pyplot as plt
+    # label_map = {i: t for i, t in enumerate(target_names)}
+    # pred = list(map(lambda x: label_map[x], pred))
+    # gt = list(map(lambda x: label_map[x], gt))
+    # disp = metrics.ConfusionMatrixDisplay.from_predictions(
+    #     gt, pred, labels=target_names
+    # )
+    # disp.plot()
+    # plt.show()
+
     return pd.DataFrame(report).transpose()
 
 def merge_gesture_sequence(seq):
@@ -100,3 +152,4 @@ def compute_edit_score(gt, pred):
     import editdistance
     max_len = max(len(gt), len(pred))
     return 1.0 - editdistance.eval(gt, pred)/max_len
+
