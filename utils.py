@@ -90,7 +90,7 @@ def get_dataloaders(tasks: List[str],
         assert(task in all_tasks)
         files = os.listdir(data_path)
         csv_files = [p for p in files if p.endswith(".csv")]
-        with open(os.path.join(data_path, "video_files.txt"), 'r') as fp:
+        with open(os.path.join(data_path, "video_feature_files.txt"), 'r') as fp:
             video_files = fp.read().strip().split('\n')
         csv_files.sort(key = lambda x: os.path.basename(x)[:-4])
         video_files.sort(key = lambda x: os.path.basename(x)[:-4])

@@ -4,6 +4,7 @@ import os
 import sys
 
 all_tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing", "Pea_on_a_Peg", "Post_and_Sleeve"]
+JIGSAWS_tasks = ["Suturing", "Knot_Tying", "Needle_Passing"]
 class_names = {
     "Peg_Transfer": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
     "Suturing": ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11'],
@@ -22,6 +23,8 @@ feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
             "PSMR_gripper_angle"]
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
 state_variables_repeating_factor = 10
+
+image_features_save_path = './image_features'
 
 def generate_data(task: str):
     processed_data_path = "./ProcessedDatasets"
@@ -79,13 +82,14 @@ def generate_data(task: str):
             kinematics.to_csv(os.path.join(task_path_target, file[:-3] + 'csv'), index=False)
 
             # collect the video path files
-            video_file_path = os.path.join(video_path, file[:-4] + '_Right' + '.avi')
-            if not os.path.isfile(video_file_path):
-                video_file_path = video_file_path.replace('avi', 'mp4')
-                print(video_file_path)
-            videos.append(video_file_path)
+            video_features_file_path = os.path.join(image_features_save_path, task, file[:-4] + '_Right' + '.npy')
+            if not os.path.exists(video_features_file_path):
+                video_features_file_path = os.path.join(image_features_save_path, task, file[:-4] + '_Left' + '.npy')
+            if not os.path.exists(video_features_file_path):
+                raise ValueError(f"The features for video file {os.path.basename(video_features_file_path)} does not exist")
+            videos.append(video_features_file_path)
     
-    with open(os.path.join(task_path_target, 'video_files.txt'), 'w') as fp:
+    with open(os.path.join(task_path_target, 'video_feature_files.txt'), 'w') as fp:
         for v in videos:
             fp.write(v + '\n')
 
