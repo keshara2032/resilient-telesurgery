@@ -78,6 +78,8 @@ class LOUO_Dataset(Dataset):
             X = _X
             X_image = _X_image
             Y = _Y
+            Y_future = np.array([])
+            P = np.array([])
         X = torch.from_numpy(X).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
         X_image = torch.from_numpy(X_image).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
         target_type = target_type = torch.float32 if self.onehot else torch.long
@@ -109,6 +111,10 @@ class LOUO_Dataset(Dataset):
                 image_features = image_features[:last_index]
 
                 # drop the frames where the label does not exist
+                drop_ind = kin_label[kin_label == '-'].index
+                kin_data = kin_data.drop(index=drop_ind)
+                kin_label = kin_label.drop(index=drop_ind)
+                image_features = np.delete(image_features, drop_ind.tolist(), axis=0)
 
                 X_image.append(image_features)
                 X.append(kin_data.values)
