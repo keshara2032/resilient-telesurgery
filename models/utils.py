@@ -4,10 +4,11 @@ import torch
 from torch import Tensor
 from torch.nn import Transformer
 import torch.nn as nn
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 
@@ -122,6 +123,18 @@ def plot_sequences_as_horizontal_bar(sequence1, sequence2):
 def get_tgt_mask(window_size, device):
     return Transformer.generate_square_subsequent_mask(window_size, device)
 
+def plot_confusion_matrix(conf_matrix, labels):
+    row_normalized_conf_matrix = conf_matrix / conf_matrix.sum(axis=1, keepdims=True)
+    row_normalized_conf_matrix = np.round(row_normalized_conf_matrix, 2)
+
+    plt.figure(figsize=(10, 8))
+    sns.set(font_scale=1.2)
+    sns.heatmap(row_normalized_conf_matrix, annot=True, cmap='Blues', xticklabels=labels, yticklabels=labels, annot_kws={'size': 12, 'ha': 'center'})
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title('Row-Normalized Confusion Matrix (with 2 decimal places)')
+    plt.show()
+
 def get_classification_report(pred, gt, target_names):
 
     # get the classification report
@@ -129,16 +142,8 @@ def get_classification_report(pred, gt, target_names):
     report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
 
     # plot computation matrix
-    # from sklearn import metrics
-    # import matplotlib.pyplot as plt
-    # label_map = {i: t for i, t in enumerate(target_names)}
-    # pred = list(map(lambda x: label_map[x], pred))
-    # gt = list(map(lambda x: label_map[x], gt))
-    # disp = metrics.ConfusionMatrixDisplay.from_predictions(
-    #     gt, pred, labels=target_names
-    # )
-    # disp.plot()
-    # plt.show()
+    conf_matrix = confusion_matrix(gt, pred)
+    plot_confusion_matrix(conf_matrix, target_names)
 
     return pd.DataFrame(report).transpose()
 

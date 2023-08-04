@@ -53,23 +53,38 @@ class LOUO_Dataset(Dataset):
             trial_start = sum(self.samples_per_trial[:trial_id])
         trial_end = trial_start + self.samples_per_trial[trial_id]
         _X = self.X[trial_start + 1 : trial_end + 1]
+        print(_X.shape)
+        _X_image = self.X_image[trial_start + 1 : trial_end + 1]
         _Y = self.Y[trial_start : trial_end + 1]
         if window_size > 0:
+            X_image = []
             X = []
             Y = []
+            Y_future = []
+            P = []
             num_windows = _X.shape[0]//window_size
-            for i in range(num_windows):
+            for i in range(num_windows - 1):
                 X.append(_X[i*window_size:(i+1)*window_size])
+                X_image.append(_X_image[i*window_size:(i+1)*window_size])
                 Y.append(_Y[i*window_size:(i+1)*window_size])
+                Y_future.append(_Y[(i+1)*window_size:(i+2)*window_size])
+                P.append(_X[(i+1)*window_size:(i+2)*window_size])
+            X_image = np.array(X_image)
             X = np.array(X)
             Y = np.array(Y)
+            Y_future = np.array(Y_future)
+            P = np.array(P)
         else:
             X = _X
+            X_image = _X_image
             Y = _Y
         X = torch.from_numpy(X).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
+        X_image = torch.from_numpy(X_image).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
         target_type = target_type = torch.float32 if self.onehot else torch.long
         Y = torch.from_numpy(Y).to(target_type).to(self.device)
-        return X, Y
+        Y_future = torch.from_numpy(Y_future).to(target_type).to(self.device)
+        P = torch.from_numpy(P).to(torch.float32).to(self.device)
+        return X, X_image, Y, Y_future, P
 
         
     def _load_data(self):
@@ -85,13 +100,23 @@ class LOUO_Dataset(Dataset):
                 feature_names = kinematics_data.columns.to_list()[:-1] if not self.feature_names else self.feature_names
                 kin_data = kinematics_data.loc[:, feature_names]
                 kin_label = kinematics_data.iloc[:,-1] # last column is always taken to be the target class
+                image_features = np.load(video_path)
 
-                X_image.append(np.load(video_path))
+                # limit by the length of the smaller tensor, image or kin
+                last_index = min(image_features.shape[0], len(kin_data))
+                kin_data = kin_data.iloc[:last_index]
+                kin_label = kin_label.iloc[:last_index]
+                image_features = image_features[:last_index]
+
+                # drop the frames where the label does not exist
+
+                X_image.append(image_features)
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
 
         self.max_len = max([d.shape[0] for d in X])
+        print(self.samples_per_trial)
         
         # label encoding and transformation
         if not self.target_names:

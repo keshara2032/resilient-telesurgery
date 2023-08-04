@@ -76,7 +76,6 @@ def generate_data(task: str):
             for i, row in labels.iterrows():
                 start, stop, mp = int(row['Start']), int(row['Stop']), row['MP']
                 kinematics.loc[start:stop, 'label'] = mp
-            kinematics = kinematics[kinematics['label'] != '-']
 
             # save compound file contaning kinematics, state variables and gesture label
             kinematics.to_csv(os.path.join(task_path_target, file[:-3] + 'csv'), index=False)

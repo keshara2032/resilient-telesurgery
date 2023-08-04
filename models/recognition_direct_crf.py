@@ -216,4 +216,4 @@ class Trainer:
         print('pred: ', pred)
         print('gt: ', gt)
         print(get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names()))
-        plot_sequences_as_horizontal_bar(pred[:1000], gt[:1000])
+        
