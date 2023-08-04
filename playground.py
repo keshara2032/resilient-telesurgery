@@ -47,17 +47,13 @@ print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
 print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
 print("Features: ", train_dataloader.dataset.get_feature_names())
 
-X, X_image, Y, Y_future, P = valid_dataloader.dataset.get_trial(0, observation_window)
+X, X_image, Y, Y_future, P = valid_dataloader.dataset.get_trial(0)
 print('Single Trial:')
 print(f'X shape: {X.shape}')
 print(f'X_image shape: {X_image.shape}')
 print(f'Y shape: {Y.shape}')
 print(f'Y_future shape: {Y_future.shape}')
 print(f'P shape: {P.shape}')
-exit()
-
-
-
 
 
 ### -------------------------- Model -----------------------------------------------------

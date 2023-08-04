@@ -84,40 +84,68 @@ class ScheduledOptim():
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
 
-def plot_sequences_as_horizontal_bar(sequence1, sequence2):
-    colors = colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black', 'white', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive']
-    unique_numbers1 = sorted(set(sequence1))
-    unique_numbers2 = sorted(set(sequence2))
-    all_unique_numbers = sorted(set(unique_numbers1 + unique_numbers2))
+def plot_bars(gt, pred):
 
-    color_map = {num: color for num, color in zip(all_unique_numbers, colors)}
+    print(gt, pred)
 
-    def plot_sequence(sequence, offset):
-        current_number = sequence[0]
-        start_idx = 0
-        spans = []
+    def plot_sequence_as_horizontal_bar(sequence, title, ax):
+        if not sequence:
+            print(f"Error: Empty sequence for {title}!")
+            return
 
-        for i, num in enumerate(sequence):
-            if num != current_number:
-                spans.append((start_idx, i - 1, current_number))
-                start_idx = i
-                current_number = num
+        # Initialize variables
+        unique_elements = [sequence[0]]
+        span_lengths = [1]
 
-        # Add the last span
-        spans.append((start_idx, len(sequence) - 1, current_number))
+        # Calculate the span lengths of each element in the sequence
+        for i in range(1, len(sequence)):
+            if sequence[i] == sequence[i - 1]:
+                span_lengths[-1] += 1
+            else:
+                unique_elements.append(sequence[i])
+                span_lengths.append(1)
 
-        for i, (start, end, num) in enumerate(spans):
-            color = color_map[num]
-            plt.barh(offset, end - start + 1, left=start, height=0.5, color=color, edgecolor='black')
-            # plt.text(start + (end - start + 1) / 2, offset, str(num), ha='center', va='center', color='white', fontsize=12)
+        # Create the horizontal bar plot
+        current_position = 0
 
-    plt.figure(figsize=(10, 4))
-    plt.yticks([])
-    plot_sequence(sequence1, 0)
-    plot_sequence(sequence2, 1)
+        for i in range(len(unique_elements)):
+            element = unique_elements[i]
+            span_length = span_lengths[i]
+            ax.barh(0, span_length, left=current_position, height=1, color=f'C{element}')
+            current_position += span_length
 
-    plt.xlabel('Sequence Index')
-    plt.title('Horizontal Bar Plot of Sequences')
+        ax.set_yticks([])
+        ax.set_xticks([])
+        # ax.set_xlabel("Sequence")
+        # ax.set_title(title)
+
+    def plot_difference_bar(true_sequence, pred_sequence, ax):
+        if not true_sequence or not pred_sequence:
+            print("Error: Empty sequences!")
+            return
+
+        # Create a horizontal bar plot to indicate differences between sequences
+        current_position = 0
+        for true_elem, pred_elem in zip(true_sequence, pred_sequence):
+            color = 'red' if true_elem != pred_elem else 'white'
+            ax.barh(0, 1, left=current_position, height=1, color=color)
+            current_position += 1
+
+        ax.set_yticks([])
+        ax.set_xticks([])
+        # ax.set_title("Difference")
+    
+    # Replace these with your actual sequences
+    true_sequence = gt
+    pred_sequence = pred
+
+    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 12))
+
+    plot_sequence_as_horizontal_bar(true_sequence, "Ground Truth", axes[0])
+    plot_sequence_as_horizontal_bar(pred_sequence, "Predictions", axes[1])
+    plot_difference_bar(true_sequence, pred_sequence, axes[2])
+
+    plt.tight_layout()
     plt.show()
 
 def get_tgt_mask(window_size, device):
@@ -144,6 +172,8 @@ def get_classification_report(pred, gt, target_names):
     # plot computation matrix
     conf_matrix = confusion_matrix(gt, pred)
     plot_confusion_matrix(conf_matrix, target_names)
+
+    pd.DataFrame(report).transpose().to_csv("metrics.csv")
 
     return pd.DataFrame(report).transpose()
 
