@@ -68,7 +68,8 @@ if __name__ == "__main__":
         os.mkdir(image_features_save_path)
 
     i = 0
-    for task in JIGSAWS_tasks:
+    # for task in JIGSAWS_tasks:
+    for task in ['Peg_Transfer']:
 
         video_paths = list()
 
@@ -79,7 +80,8 @@ if __name__ == "__main__":
         video_folder_path = os.path.join("./Datasets/dV/", task, 'video')
         for file_name in os.listdir(video_folder_path):
             video_path = os.path.join(video_folder_path, file_name)
-            if ('Right' in video_path) or (not os.path.exists(video_path.replace('Left', 'Right'))):
+
+            if ('right' in video_path.lower()) or (not os.path.exists(video_path.lower().replace('left', 'right'))):
                 video_paths.append(video_path)
                 
         for video_path in video_paths:

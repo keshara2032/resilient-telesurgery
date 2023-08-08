@@ -124,7 +124,7 @@ class Trainer:
         with torch.no_grad():
             # eval
             losses, nums = zip(*[
-                (model.loss(src.to(device), tgt[:, 1:].to(device)), len(src))
+                (model.loss(src, tgt[:, 1:].to(device)), len(src))
                 for src, src_image, tgt, future_gesture, future_kinematics in tqdm(dataloader, desc=desc)])
             losses = [l.item() for l in losses]
             return np.sum(np.multiply(losses, nums)) / np.sum(nums)
@@ -177,7 +177,7 @@ class Trainer:
         for epoch in range(epochs):
             # train
             model.train()
-            for bi, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
+            for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
                 model.zero_grad()
 
                 loss = model.loss(src, tgt[:, 1:])
@@ -203,9 +203,9 @@ class Trainer:
 
     def _compute_metrics(self, valid_dataloader, model):
         pred, gt = list(), list()
-        for bi, (src, src_image, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
+        for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
 
-            _, tag_seq = model.forward(src)
+            _, tag_seq = model.forward(src, dim=-1)
             tags = np.array(tag_seq).reshape(-1)
             pred.append(tags)
 

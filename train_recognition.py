@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report
 from timeit import default_timer as timer
 from models.recognition_direct_transformer import DirectTransformerRecognitionModel
 from models.utils import get_tgt_mask, ScheduledOptim
-from utils import visualize_gesture_ts, get_dataloaders
+from utils import get_dataloaders
 from models.utils import get_classification_report
 from datagen import feature_names, class_names, all_class_names, state_variables
 

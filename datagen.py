@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import sys
 
-all_tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing", "Pea_on_a_Peg", "Post_and_Sleeve"]
+all_tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing"]
 JIGSAWS_tasks = ["Suturing", "Knot_Tying", "Needle_Passing"]
 class_names = {
     "Peg_Transfer": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
@@ -13,7 +13,7 @@ class_names = {
 }
 all_class_names = ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15']
 
-feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
+kinematic_feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
             "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z", \
             "PSML_orientation_x", "PSML_orientation_y", "PSML_orientation_z", "PSML_orientation_w", \
             "PSML_gripper_angle", \
