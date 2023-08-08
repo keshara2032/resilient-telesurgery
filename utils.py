@@ -1,70 +1,22 @@
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
-import altair as alt
-from altair_saver import save
-import altair_viewer
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
+
 
 from dataset import LOUO_Dataset
 
-
-def visualize_gesture_ts(pred, gt, target_names):
-
-    def _convert_label_to_range(labels):
-        df = pd.DataFrame({'gesture': labels})
-        pred_index_changes = df["gesture"].diff()[df["gesture"].diff() != 0].index.values
-
-        changes_df = df.iloc[pred_index_changes]
-        changes_df.reset_index(inplace=True)
-        # changes_df.drop(columns=changes_df.columns[0], axis=1, inplace=True)
-
-        index_change = []
-        for idx, _ in changes_df.iterrows():
-            if(idx < changes_df.shape[0]-1):
-                index_change.append([changes_df.iloc[idx]["index"], changes_df.iloc[idx+1]["index"], changes_df.iloc[idx]["gesture"]])
-
-        gesture_range_df  = pd.DataFrame(index_change)
-        gesture_range_df.columns = ["start","end","gesture"]
-
-        label_mappings = {i: target_names[i] for i in range(len(target_names))}
-        gesture_range_df["gesture"] = gesture_range_df["gesture"].map(label_mappings)
-
-        return gesture_range_df
-    
-    pred_gesture_ranges_df = _convert_label_to_range(pred)
-    gt_gesture_ranges_df = _convert_label_to_range(gt)
-
-    # pred = alt.Chart(pred_gesture_ranges_df).mark_bar(clip=True).encode(
-    #     x=alt.X('start', scale=alt.Scale(domain=[0,3000])),
-    #     x2='end',
-    #     y=alt.Y('sum(gesture)',title = "Gesture", axis=alt.Axis(labels=False)),
-    #     color=alt.Color('gesture', scale=alt.Scale(scheme='dark2'))
-    # ).properties(
-    #     width=800,
-    #     height=25,
-    #     title="Prediction"
-    # )
-
-    # gt = alt.Chart(gt_gesture_ranges_df).mark_bar(clip=True).encode(
-    #     x=alt.X('start', scale=alt.Scale(domain=[0,3000])),
-    #     x2='end',
-    #     y=alt.Y('sum(gesture)',title = "Gesture", axis=alt.Axis(labels=False)),
-    #     color=alt.Color('gesture', scale=alt.Scale(scheme='dark2'))
-    # ).properties(
-    #     width=800,
-    #     height=25,
-    #     title="Ground Truth"
-    # )
-
-    # alt.vconcat(
-    # gt.mark_bar(clip=True),
-    # pred.mark_bar(clip=True),
-    # )
-
-    plt.scatter(np.arange(pred.shape[0]), pred, c='red')
-    plt.scatter(np.arange(pred.shape[0]), gt, c='blue')
-    plt.show()
+def get_normalizer(normalization_type):
+    if normalization_type == 'standardization':
+        normalization_object = StandardScaler()
+    elif normalization_type == 'min-max':
+        normalization_object = MinMaxScaler()
+    elif normalization_type == 'power':
+        normalization_object = PowerTransformer()
+    else:
+        normalization_object = None
+    return normalization_object
 
 def get_dataloaders(tasks: List[str],
                     subject_id_to_exclude: str,
@@ -74,7 +26,9 @@ def get_dataloaders(tasks: List[str],
                     one_hot: bool,
                     class_names: List[str],
                     feature_names: List[str],
-                    cast: bool):
+                    include_image_features: bool,
+                    cast: bool,
+                    normalizer: str):
     
     from typing import List
     import os
@@ -100,6 +54,7 @@ def get_dataloaders(tasks: List[str],
 
 
     # building train and validation datasets and dataloaders
+    normalizer = get_normalizer(normalizer)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_files_path, valid_files_path = list(), list()
     for task in tasks:
@@ -107,8 +62,9 @@ def get_dataloaders(tasks: List[str],
         tp, vp = _get_files_except_user(task, data_path, subject_id_to_exclude)
         train_files_path += tp
         valid_files_path += vp
-    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names)
-    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names)
+    
+    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
+    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
 
     target_type = torch.float32 if one_hot else torch.long
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast))
