@@ -72,7 +72,7 @@ class LOUO_Dataset(Dataset):
             self.feature_names = self.feature_names_ + [f"img_{i}" for i in range(_X_image.shape[-1])]
         
         if step > 0:
-            self.X. self.Y = self.X[::step], self.X_image[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
+            self.X. self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
 
         # feature normalization
         if normalizer:
@@ -201,14 +201,14 @@ class LOUO_Dataset(Dataset):
     
     def __getitem__(self, idx):
         # this should return one sample from the dataset
-        kinematic_features = self.X[idx + 1 : idx + self.observation_window_size + 1]
+        features = self.X[idx + 1 : idx + self.observation_window_size + 1]
         # image_features = self.X_image[idx + 1 : idx + self.observation_window_size + 1]
         target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
         gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         
         # return kinematic_features, image_features, target, gesture_pred_target, traj_pred_target
-        return kinematic_features, target, gesture_pred_target, traj_pred_target
+        return features, target, gesture_pred_target, traj_pred_target
 
     
     @staticmethod

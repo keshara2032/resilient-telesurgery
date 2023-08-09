@@ -19,11 +19,11 @@ one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 30
 prediction_window = 40
-batch_size = 64
-user_left_out = 3
+batch_size = 16
+user_left_out = 2
 cast = True
 include_image_features = True
-normalizer = 'standardization' # ('standardization', 'min-max', 'power', '')
+normalizer = '' # ('standardization', 'min-max', 'power', '')
 
 train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      user_left_out,
@@ -41,7 +41,7 @@ print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
 print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
 
-# loader generator aragement: (src, src_image, tgt, future_gesture, future_kinematics)
+# loader generator aragement: (src, tgt, future_gesture, future_kinematics)
 print("Obs Kinematics Shape: ", train_dataloader.dataset[0][0].shape) 
 print("Obs Target Shape: ", train_dataloader.dataset[0][1].shape)
 print("Future Target Shape: ", train_dataloader.dataset[0][2].shape)
