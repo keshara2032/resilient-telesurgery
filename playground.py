@@ -17,13 +17,14 @@ Features = kinematic_feature_names + state_variables #kinematic features + state
 
 one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-observation_window = 30
-prediction_window = 40
-batch_size = 16
+observation_window = 5
+prediction_window = 5
+batch_size = 5
 user_left_out = 2
 cast = True
 include_image_features = True
 normalizer = '' # ('standardization', 'min-max', 'power', '')
+step = 6 # 5 Hz
 
 train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      user_left_out,
@@ -35,7 +36,8 @@ train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      feature_names = Features,
                                                      include_image_features=include_image_features,
                                                      cast = cast,
-                                                     normalizer = normalizer)
+                                                     normalizer = normalizer,
+                                                     step=step)
 
 print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
 print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)

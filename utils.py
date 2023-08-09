@@ -28,7 +28,8 @@ def get_dataloaders(tasks: List[str],
                     feature_names: List[str],
                     include_image_features: bool,
                     cast: bool,
-                    normalizer: str):
+                    normalizer: str,
+                    step: int = -1):
     
     from typing import List
     import os
@@ -63,8 +64,8 @@ def get_dataloaders(tasks: List[str],
         train_files_path += tp
         valid_files_path += vp
     
-    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
-    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
+    train_dataset = LOUO_Dataset(train_files_path, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
+    valid_dataset = LOUO_Dataset(valid_files_path, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, include_image_features=include_image_features, normalizer=normalizer)
 
     target_type = torch.float32 if one_hot else torch.long
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast))
