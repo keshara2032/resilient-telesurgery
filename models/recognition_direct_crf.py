@@ -54,7 +54,7 @@ class DirectCRFRecognitionModel(nn.Module):
                 input_dim, dropout=dropout, max_len=max_len)
             self.encoder_input_transform = torch.nn.Linear(in_features=input_dim, out_features=hidden_dim)
             encoder_layers = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=nhead,
-                             dim_feedforward=dim_feedforward, dropout=dropout)
+                             dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True)
             self.encoder = nn.TransformerEncoder(
                 encoder_layers, num_layers=num_layers
             )
@@ -85,7 +85,7 @@ class DirectCRFRecognitionModel(nn.Module):
             if self.emb_dim:
                 sentences = self.encoder_input_transform(sentences)
             sentences = self.dropout(sentences)
-            encoder_out, _ = self.rnn(sentences)
+            encoder_out, _ = self.encoder(sentences)
         else:
             sentences = sentences.transpose(0, 1) # batch first to seq first
             # src transformation
@@ -125,7 +125,7 @@ class Trainer:
             # eval
             losses, nums = zip(*[
                 (model.loss(src, tgt[:, 1:].to(device)), len(src))
-                for src, src_image, tgt, future_gesture, future_kinematics in tqdm(dataloader, desc=desc)])
+                for src, tgt, future_gesture, future_kinematics in tqdm(dataloader, desc=desc)])
             losses = [l.item() for l in losses]
             return np.sum(np.multiply(losses, nums)) / np.sum(nums)
 
@@ -205,7 +205,7 @@ class Trainer:
         pred, gt = list(), list()
         for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
 
-            _, tag_seq = model.forward(src, dim=-1)
+            _, tag_seq = model.forward(src)
             tags = np.array(tag_seq).reshape(-1)
             pred.append(tags)
 
