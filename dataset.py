@@ -72,7 +72,7 @@ class LOUO_Dataset(Dataset):
             self.feature_names = self.feature_names_ + [f"img_{i}" for i in range(_X_image.shape[-1])]
         
         if step > 0:
-            self.X. self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
+            self.X, self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
 
         # feature normalization
         if normalizer:
