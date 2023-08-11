@@ -57,7 +57,7 @@ if __name__ == '__main__':
             dest_file = os.path.join(dest_kin_folder, dest_file)
             kin_data = pd.read_csv(file, delimiter='\s+', on_bad_lines='skip', header=None)
             kin_data.columns = kinematic_feature_names_jigsaws
-            kin_data.to_csv(dest_file)
+            kin_data.to_csv(dest_file, index=False)
 
 # video
 for file in os.listdir(video_path):
