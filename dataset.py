@@ -67,6 +67,7 @@ class LOUO_Dataset(Dataset):
 
         # reading the data (kinematic features, [image features, context features])
         (self.X, _X_image, self.Y) = self._load_data() 
+        self.feature_names = self.feature_names_
         if include_image_features:
             self.X = np.concatenate([self.X, _X_image], axis=-1)
             self.feature_names = self.feature_names_ + [f"img_{i}" for i in range(_X_image.shape[-1])]
