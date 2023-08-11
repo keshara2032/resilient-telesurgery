@@ -7,24 +7,24 @@ import numpy as np
 import pandas as pd
 from timeit import default_timer as timer
 from utils import get_dataloaders
-from datagen import kinematic_feature_names, class_names, all_class_names, state_variables
+from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, class_names, all_class_names, state_variables
 
 
 
 ### -------------------------- DATA -----------------------------------------------------
-tasks = ["Suturing", "Needle_Passing", "Knot_Tying"]
-Features = kinematic_feature_names + state_variables #kinematic features + state variable features
+tasks = ["Suturing"]
+Features = kinematic_feature_names_jigsaws[38:] + state_variables #kinematic features + state variable features
 
 one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-observation_window = 5
-prediction_window = 5
-batch_size = 5
+observation_window = 10
+prediction_window = 10
+batch_size = 4
 user_left_out = 2
 cast = True
-include_image_features = True
+include_image_features = False
 normalizer = '' # ('standardization', 'min-max', 'power', '')
-step = 6 # 5 Hz
+step = 3 # 10 Hz
 
 train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      user_left_out,

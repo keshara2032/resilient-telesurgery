@@ -29,7 +29,7 @@ if __name__ == '__main__':
     )
     video_map = dict(capture1='Left', capture2='Right')
 
-    # TODO: make `Datasets` like paths if they don't exist already
+    # make `Datasets` like paths if they don't exist already
     Datasets_path = './Datasets/dV'
     dest_task_path = os.path.join(Datasets_path, task)
     dest_kin_folder = os.path.join(dest_task_path, 'kinematics')
