@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+from collections import OrderedDict
 
 all_tasks = ["Peg_Transfer", "Suturing", "Knot_Tying", "Needle_Passing"]
 JIGSAWS_tasks = ["Suturing", "Knot_Tying", "Needle_Passing"]
@@ -21,6 +22,26 @@ kinematic_feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position
             "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z", \
             "PSMR_orientation_x", "PSMR_orientation_y", "PSMR_orientation_z", "PSMR_orientation_w", \
             "PSMR_gripper_angle"]
+kinematic_feature_names_jigsaws = ["MTML_position_x", "MTML_position_y", "MTML_position_z",
+                                        "MTML_rotation_0", "MTML_rotation_1", "MTML_rotation_2", "MTML_rotation_3", "MTML_rotation_4", "MTML_rotation_5", "MTML_rotation_6", "MTML_rotation_7", "MTML_rotation_8",
+                                        "MTML_velocity_x", "MTML_velocity_y", "MTML_velocity_z",
+                                        "MTML_velocity_rot0", "MTML_velocity_rot1", "MTML_velocity_rot2",
+                                        "MTML_gripper_angle", 
+                                        "MTMR_position_x", "MTMR_position_y", "MTMR_position_z",
+                                        "MTMR_rotation_0", "MTMR_rotation_1", "MTMR_rotation_2", "MTMR_rotation_3", "MTMR_rotation_4", "MTMR_rotation_5", "MTMR_rotation_6", "MTMR_rotation_7", "MTMR_rotation_8",
+                                        "MTMR_velocity_x", "MTMR_velocity_y", "MTMR_velocity_z",
+                                        "MTMR_velocity_rot0", "MTMR_velocity_rot1", "MTMR_velocity_rot2",
+                                        "MTMR_gripper_angle",
+                                    "PSML_position_x", "PSML_position_y", "PSML_position_z",
+                                        "PSML_rotation_0", "PSML_rotation_1", "PSML_rotation_2", "PSML_rotation_3", "PSML_rotation_4", "PSML_rotation_5", "PSML_rotation_6", "PSML_rotation_7", "PSML_rotation_8",
+                                        "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z",
+                                        "PSML_velocity_rot0", "PSML_velocity_rot1", "PSML_velocity_rot2",
+                                        "PSML_gripper_angle", 
+                                        "PSMR_position_x", "PSMR_position_y", "PSMR_position_z",
+                                        "PSMR_rotation_0", "PSMR_rotation_1", "PSMR_rotation_2", "PSMR_rotation_3", "PSMR_rotation_4", "PSMR_rotation_5", "PSMR_rotation_6", "PSMR_rotation_7", "PSMR_rotation_8",
+                                        "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z",
+                                        "PSMR_velocity_rot0", "PSMR_velocity_rot1", "PSMR_velocity_rot2",
+                                        "PSMR_gripper_angle"]
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
 state_variables_repeating_factor = 10
 
