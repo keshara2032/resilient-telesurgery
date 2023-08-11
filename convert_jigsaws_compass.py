@@ -1,8 +1,17 @@
 import os
+import shutil
 
 import pandas as pd
 
 from datagen import kinematic_feature_names_jigsaws
+
+
+def create_nested_directory(path):
+    try:
+        os.makedirs(path)
+        print(f"Directory '{path}' created successfully.")
+    except FileExistsError:
+        print(f"Directory '{path}' already exists. Skipping creation.")
 
 if __name__ == '__main__':
 
@@ -26,6 +35,10 @@ if __name__ == '__main__':
     dest_kin_folder = os.path.join(dest_task_path, 'kinematics')
     dest_video_folder = os.path.join(dest_task_path, 'video')
     dest_gesture_folder = os.path.join(dest_task_path, 'gestures')
+    create_nested_directory(Datasets_path)
+    create_nested_directory(dest_kin_folder)
+    create_nested_directory(dest_video_folder)
+    create_nested_directory(dest_gesture_folder)
 
     task_path = os.path.join('JIGSAWS_Dataset', 'JIGSAWS_Dataset', task, task)
     kin_path = os.path.join(task_path, 'kinematics', 'AllGestures')
@@ -39,14 +52,35 @@ if __name__ == '__main__':
         if file.endswith('.txt'):
             for letter in subject_maps.keys():
                 if letter in file:
-                    dest_file = file.replace(letter+'0', subject_maps[letter]+'_T')
+                    dest_file = file.replace(letter+'0', subject_maps[letter]+'_T').replace('.txt', '.csv')
             file = os.path.join(kin_path, file)
             dest_file = os.path.join(dest_kin_folder, dest_file)
             kin_data = pd.read_csv(file, delimiter='\s+', on_bad_lines='skip', header=None)
             kin_data.columns = kinematic_feature_names_jigsaws
-            print(kin_data.head())
-            input()
-    
+            kin_data.to_csv(dest_file)
 
+# video
+for file in os.listdir(video_path):
+    if file.endswith('.avi'):
+        for letter in subject_maps.keys():
+            if letter in file:
+                dest_file = file.replace(letter+'0', subject_maps[letter]+'_T')
+        for c in video_map:
+            if c in file:
+                dest_file = dest_file.replace(c, video_map[c])
+        file = os.path.join(video_path, file)
+        dest_file = os.path.join(dest_video_folder, dest_file)
+        shutil.copy(file, dest_file)
+
+    
+# gestures
+for file in os.listdir(transcriptions_path):
+    if file.endswith('.txt'):
+        for letter in subject_maps.keys():
+            if letter in file:
+                dest_file = file.replace(letter+'0', subject_maps[letter]+'_T')
+        file = os.path.join(transcriptions_path, file)
+        dest_file = os.path.join(dest_gesture_folder, dest_file)
+        shutil.copy(file, dest_file)
 
 
