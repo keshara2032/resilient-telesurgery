@@ -40,7 +40,7 @@ if __name__ == '__main__':
     create_nested_directory(dest_video_folder)
     create_nested_directory(dest_gesture_folder)
 
-    task_path = os.path.join('JIGSAWS_Dataset', 'JIGSAWS_Dataset', task, task)
+    task_path = os.path.join('JIGSAWS', task)
     kin_path = os.path.join(task_path, 'kinematics', 'AllGestures')
     video_path = os.path.join(task_path, 'video')
     transcriptions_path = os.path.join(task_path, 'transcriptions')
