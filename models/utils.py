@@ -171,7 +171,7 @@ def get_classification_report(pred, gt, target_names):
 
     # plot computation matrix
     conf_matrix = confusion_matrix(gt, pred)
-    plot_confusion_matrix(conf_matrix, target_names)
+    # plot_confusion_matrix(conf_matrix, target_names)
 
     pd.DataFrame(report).transpose().to_csv("metrics.csv")
 

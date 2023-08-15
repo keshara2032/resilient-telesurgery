@@ -198,13 +198,19 @@ class LOUO_Dataset(Dataset):
     
     def __len__(self):
         # this should return the size of the dataset
-        return self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1
+        # return self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1
+        return int((self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1)/self.observation_window_size)
+        
     
     def __getitem__(self, idx):
         # this should return one sample from the dataset
-        features = self.X[idx + 1 : idx + self.observation_window_size + 1]
+        start_idx = idx * self.observation_window_size
+        end_idx = (idx + 1) * self.observation_window_size
+        
+        # features = self.X[idx + 1 : idx + self.observation_window_size + 1]
+        features = self.X[start_idx + 1 : end_idx + 1]
         # image_features = self.X_image[idx + 1 : idx + self.observation_window_size + 1]
-        target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
+        target = self.Y[start_idx : end_idx + 1] # one additional observation is given for recursive decoding in recognition task
         gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
         
