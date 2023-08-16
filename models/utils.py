@@ -84,14 +84,12 @@ class ScheduledOptim():
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
 
-def plot_bars(gt, pred):
-
-    print(gt, pred)
+def plot_bars(gt, pred=None, states=None):
 
     def plot_sequence_as_horizontal_bar(sequence, title, ax):
-        if not sequence:
-            print(f"Error: Empty sequence for {title}!")
-            return
+        # if not sequence:
+        #     print(f"Error: Empty sequence for {title}!")
+        #     return
 
         # Initialize variables
         unique_elements = [sequence[0]]
@@ -117,12 +115,13 @@ def plot_bars(gt, pred):
         ax.set_yticks([])
         ax.set_xticks([])
         # ax.set_xlabel("Sequence")
-        # ax.set_title(title)
+        ax.set_ylabel(title)
+        ax.yaxis.label.set(rotation='horizontal', ha='right')
 
     def plot_difference_bar(true_sequence, pred_sequence, ax):
-        if not true_sequence or not pred_sequence:
-            print("Error: Empty sequences!")
-            return
+        # if not true_sequence or not pred_sequence:
+        #     print("Error: Empty sequences!")
+        #     return
 
         # Create a horizontal bar plot to indicate differences between sequences
         current_position = 0
@@ -139,17 +138,25 @@ def plot_bars(gt, pred):
     true_sequence = gt
     pred_sequence = pred
 
-    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 12))
+    nrows = 1
+    if pred is not None:
+        nrows += 2 # plot the prediciton and difference bars
+    if states is not None:
+        nrows += 5 # plot the state changes
+    fig, axes = plt.subplots(nrows=nrows, sharex=True, ncols=1, figsize=(10, 12))
 
     plot_sequence_as_horizontal_bar(true_sequence, "Ground Truth", axes[0])
-    plot_sequence_as_horizontal_bar(pred_sequence, "Predictions", axes[1])
-    plot_difference_bar(true_sequence, pred_sequence, axes[2])
+    if pred is not None:
+        plot_sequence_as_horizontal_bar(pred_sequence, "Predictions", axes[1])
+        plot_difference_bar(true_sequence, pred_sequence, axes[2])
+    if states is not None:
+        if pred is not None:
+            plot_state_changes(states, axes[3:])
+        else:
+            plot_state_changes(states, axes[1:])
 
     plt.tight_layout()
     plt.show()
-
-def get_tgt_mask(window_size, device):
-    return Transformer.generate_square_subsequent_mask(window_size, device)
 
 def plot_confusion_matrix(conf_matrix, labels):
     row_normalized_conf_matrix = conf_matrix / conf_matrix.sum(axis=1, keepdims=True)
@@ -174,6 +181,8 @@ def get_classification_report(pred, gt, target_names):
     plot_confusion_matrix(conf_matrix, target_names)
 
     pd.DataFrame(report).transpose().to_csv("metrics.csv")
+    accuracy = np.mean(pred == gt)
+    print(accuracy)
 
     return pd.DataFrame(report).transpose()
 
@@ -188,3 +197,34 @@ def compute_edit_score(gt, pred):
     max_len = max(len(gt), len(pred))
     return 1.0 - editdistance.eval(gt, pred)/max_len
 
+def plot_state_changes(sequences, axs):
+
+    num_sequences = len(sequences)
+    # fig, axs = plt.subplots(num_sequences, 1, sharex=True, figsize=(8, 4 * num_sequences))
+
+    markers = ['x', 'x', 'x', 'x', 'x']  # Using 'x' marker for all sequences
+    labels = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
+    colors = ['red', 'green', 'blue', 'purple', 'orange']  # Different marker colors for each sequence
+
+    for idx, (sequence, color) in enumerate(zip(sequences, colors)):
+        axs[idx].axhline(y=0, color='black')
+
+        prev_value = None
+
+        for i, value in enumerate(sequence):
+            if prev_value is None or prev_value != value:
+                axs[idx].plot(i, 0, marker=markers[idx], color=color)
+
+            prev_value = value
+
+        # axs[idx].set_title(f'Sequence {idx + 1}')
+        axs[idx].set_ylabel(labels[idx])
+        axs[idx].yaxis.label.set(rotation='horizontal', ha='right')
+        axs[idx].set_yticks([])  # Remove y ticks
+
+    axs[num_sequences - 1].set_xlabel('Index')
+    plt.tight_layout()
+    plt.show()
+
+def get_tgt_mask(window_size, device):
+    return Transformer.generate_square_subsequent_mask(window_size, device)

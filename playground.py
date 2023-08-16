@@ -8,6 +8,7 @@ import pandas as pd
 from timeit import default_timer as timer
 from utils import get_dataloaders
 from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, class_names, all_class_names, state_variables
+from models.utils import plot_bars
 
 
 
@@ -32,9 +33,9 @@ train_dataloader, valid_dataloader = get_dataloaders(tasks,
                                                      prediction_window,
                                                      batch_size,
                                                      one_hot,
-                                                     class_names = all_class_names,
+                                                     class_names = class_names['Suturing'],
                                                      feature_names = Features,
-                                                     include_image_features=include_image_features,
+                                                     include_image_features = include_image_features,
                                                      cast = cast,
                                                      normalizer = normalizer,
                                                      step=step)
@@ -60,6 +61,9 @@ print(f'X shape: {X.shape}')
 print(f'Y shape: {Y.shape}')
 print(f'Y_future shape: {Y_future.shape}')
 print(f'P shape: {P.shape}')
+
+plot_bars(Y, Y, X[:, -5:].transpose(0, 1))
+exit()
 
 
 ### -------------------------- Model -----------------------------------------------------
