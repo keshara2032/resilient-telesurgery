@@ -23,7 +23,7 @@ one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 10
 prediction_window = 10
-batch_size = 5
+batch_size = 8
 user_left_out = 2
 cast = True
 include_image_features = False
@@ -57,13 +57,9 @@ print("Train Max Length: ", train_dataloader.dataset.get_max_len())
 print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
 print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
 print("Features: ", train_dataloader.dataset.get_feature_names())
+print(train_dataloader.dataset.samples_per_trial)
 
-X, Y, Y_future, P = valid_dataloader.dataset.get_trial(0)
-print('Single Trial:')
-print(f'X shape: {X.shape}')
-print(f'Y shape: {Y.shape}')
-print(f'Y_future shape: {Y_future.shape}')
-print(f'P shape: {P.shape}')
+
 
 
 
@@ -154,39 +150,39 @@ def objective(trial):
 
     return sum(val_losses)/len(val_losses)  # Return the loss as the objective to minimize
 
-if __name__ == '__main__':
-    study = optuna.create_study(direction='minimize')  # Objective is to minimize the validation loss
-    study.optimize(objective, n_trials=20)  # You can adjust the number of trials
+# if __name__ == '__main__':
+#     study = optuna.create_study(direction='minimize')  # Objective is to minimize the validation loss
+#     study.optimize(objective, n_trials=20)  # You can adjust the number of trials
     
-    print(f"Number of finished trials: {len(study.trials)}")
-    print("Best trial:")
-    trial = study.best_trial
+#     print(f"Number of finished trials: {len(study.trials)}")
+#     print("Best trial:")
+#     trial = study.best_trial
 
-    print(f"Value: {trial.value}")
-    print("Params: ")
-    for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+#     print(f"Value: {trial.value}")
+#     print("Params: ")
+#     for key, value in trial.params.items():
+#         print(f"    {key}: {value}")
 
-# args = dict(
-#     hidden_dim = 64, # the hidden size of the rnn or transformer-encoder
-#     num_layers = 1, # number of rnn or transformer-encoder layer
-#     encoder_type = 'gru',
-#     emb_dim = 64, # not used with transformer
-#     dropout = 0.1,
-#     optimizer_type = 'Adam',
-#     weight_decay = 0.001,
-#     lr = 2e-4,
-#     save_best_val_model = True,
-#     recovery = False,
-#     nhead = 4, # not used with rnn
-#     max_len = observation_window, # not used with rnn
-#     dim_feedforward = 512 # not used with rnn
-# )
-# epochs = 10
-# model_dir = 'saved_model_files'
+args = dict(
+    hidden_dim = 128, # the hidden size of the rnn or transformer-encoder
+    num_layers = 2, # number of rnn or transformer-encoder layer
+    encoder_type = 'gru',
+    emb_dim = 128, # not used with transformer
+    dropout = 0.3,
+    optimizer_type = 'Adam',
+    weight_decay = 0.0000,
+    lr = 9.75e-4,
+    save_best_val_model = True,
+    recovery = False,
+    nhead = 4, # not used with rnn
+    max_len = observation_window, # not used with rnn
+    dim_feedforward = 512 # not used with rnn
+)
+epochs = 10
+model_dir = 'saved_model_files'
 
-# trainer = CRF_Trainer()
-# trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
+trainer = CRF_Trainer()
+trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
 
 
 

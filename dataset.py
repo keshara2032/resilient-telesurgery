@@ -50,7 +50,8 @@ class LOUO_Dataset(Dataset):
                 class_names: List[str] = [],
                 feature_names: List[str] = [],
                 include_image_features: bool = False,
-                normalizer: object = None # (normalization_object of the type['standardization', 'min-max', 'power'])
+                normalizer: object = None, # (normalization_object of the type['standardization', 'min-max', 'power'])
+                single_window_label: bool = False # instead of frame-wise labels, return a single label for a window
             ):
         
         self.files_path = files_path
@@ -64,6 +65,7 @@ class LOUO_Dataset(Dataset):
             self.enc = preprocessing.OneHotEncoder(sparse_output=False)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.step = step
+        self.single_window_label = single_window_label
 
         # reading the data (kinematic features, [image features, context features])
         (self.X, _X_image, self.Y) = self._load_data() 
@@ -74,6 +76,7 @@ class LOUO_Dataset(Dataset):
         
         if step > 0:
             self.X, self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
+            for i, _ in enumerate(self.samples_per_trial): self.samples_per_trial[i] = int(self.samples_per_trial[i]/step)
 
         # feature normalization
         if normalizer:
@@ -92,14 +95,19 @@ class LOUO_Dataset(Dataset):
     def get_max_len(self):
         return self.max_len
     
+    def get_class_weights(self):
+        value_counts = pd.Series(self.Y).value_counts(normalize=True).sort_index()
+        value_counts = 1./value_counts.to_numpy()
+        return value_counts/value_counts.sum()
+    
     def get_trial(self, trial_id: int, window_size: int = -1):
         if trial_id == 0:
             trial_start = 0
         else:
             trial_start = sum(self.samples_per_trial[:trial_id])
         trial_end = trial_start + self.samples_per_trial[trial_id]
+        print(trial_start, trial_end, self.X.shape)
         _X = self.X[trial_start + 1 : trial_end + 1]
-        print(_X.shape)
         # _X_image = self.X_image[trial_start + 1 : trial_end + 1]
         _Y = self.Y[trial_start : trial_end + 1]
         if window_size > 0:
@@ -169,7 +177,6 @@ class LOUO_Dataset(Dataset):
                 self.samples_per_trial.append(len(kin_data))
 
         self.max_len = max([d.shape[0] for d in X])
-        print(self.samples_per_trial)
         
         # label encoding and transformation
         if not self.target_names:
@@ -210,6 +217,9 @@ class LOUO_Dataset(Dataset):
         
         # return kinematic_features, image_features, target, gesture_pred_target, traj_pred_target
         return features, target, gesture_pred_target, traj_pred_target
+    
+    def __get_dominant_label(self, y):
+        pass
 
     
     @staticmethod

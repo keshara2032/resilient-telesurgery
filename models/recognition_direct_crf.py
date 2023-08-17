@@ -183,7 +183,9 @@ class Trainer:
         for epoch in range(epochs):
             # train
             model.train()
+            train_losses = []
             for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
+    
                 model.zero_grad()
 
                 loss = model.loss(src, tgt[:, 1:])
@@ -192,9 +194,13 @@ class Trainer:
                 # print("{:2d}/{} loss: {:5.2f}, val_loss: {:5.2f}".format(
                 #     epoch+1, epochs, loss, val_loss))
                 losses.append([epoch, bi, loss.item(), np.nan])
+                train_losses.append(loss.item())
+            
 
             # evaluation
             val_loss = self.__eval_model(model, device, dataloader=valid_dataloader, desc="eval").item()
+            print("Training Loss: ", np.mean(train_losses))
+            print("Validation Loss: ", val_loss)
             self._compute_metrics(valid_dataloader, model)
             # save losses
             losses[-1][-1] = val_loss
