@@ -151,6 +151,9 @@ class Trainer:
         nhead = args.get('nhead', None)
         dim_feedforward = args.get('dim_feedforward', None)
         max_len = args.get('max_len', None)
+        optimizer_type = args.get('optimizer_type', 'Adam')
+        weight_decay = args.get('weight_decay', 0.0)
+        lr = args['lr']
         model = DirectCRFRecognitionModel(
             input_dim,
             hidden_dim,
@@ -169,8 +172,11 @@ class Trainer:
         losses    = pd.read_csv(loss_path).values.tolist() if args['recovery'] and os.path.exists(loss_path) else []
 
         model.to(device)
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'], betas=(0.9, 0.98), eps=1e-9)
+        if optimizer_type == 'Adam':
+            optimizer_cls = torch.optim.Adam
+        elif optimizer_type == 'AdamW':
+            optimizer_cls = torch.optim.AdamW
+        optimizer = optimizer_cls(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         val_loss = 0
         best_val_loss = 1e4
@@ -195,11 +201,12 @@ class Trainer:
             self.__save_loss(losses, loss_path)
 
             # save model
-            if not args['save_best_val_model'] or val_loss < best_val_loss:
+            if args['save_best_val_model'] and (val_loss < best_val_loss):
                 best_val_loss = val_loss
                 model_path = os.path.join(model_dir, 'model.pth')
                 self.__save_model(model_path, model)
                 print("save model(epoch: {}) => {}".format(epoch, loss_path))
+        return val_loss
 
     def _compute_metrics(self, valid_dataloader, model):
         pred, gt = list(), list()
