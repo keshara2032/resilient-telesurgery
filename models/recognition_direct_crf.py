@@ -180,10 +180,12 @@ class Trainer:
 
         val_loss = 0
         best_val_loss = 1e4
+        
         for epoch in range(epochs):
+            train_losses = []
             # train
             model.train()
-            train_losses = []
+            
             for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
     
                 model.zero_grad()
@@ -195,8 +197,10 @@ class Trainer:
                 #     epoch+1, epochs, loss, val_loss))
                 losses.append([epoch, bi, loss.item(), np.nan])
                 train_losses.append(loss.item())
-            
-
+            # def moving_average(x, w):
+            #     return np.convolve(x, np.ones(w), 'valid') / w
+            # plt.plot(moving_average(train_losses, 10))
+            # plt.show()
             # evaluation
             val_loss = self.__eval_model(model, device, dataloader=valid_dataloader, desc="eval").item()
             print("Training Loss: ", np.mean(train_losses))
@@ -212,6 +216,9 @@ class Trainer:
                 model_path = os.path.join(model_dir, 'model.pth')
                 self.__save_model(model_path, model)
                 print("save model(epoch: {}) => {}".format(epoch, loss_path))
+        print("\n\nFINAL VAL LOSS: {}")
+        self._compute_metrics(valid_dataloader, model)
+        print("\n\n\n")
         return val_loss
 
     def _compute_metrics(self, valid_dataloader, model):
@@ -228,5 +235,5 @@ class Trainer:
         pred, gt = np.concatenate(pred), np.concatenate(gt)
         print('pred: ', pred)
         print('gt: ', gt)
-        print(get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names()))
+        get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names())
         
