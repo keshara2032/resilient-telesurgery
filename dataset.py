@@ -6,6 +6,8 @@ from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 
+import math
+
 
 
 def normalize_columns(matrix, normalizer):
@@ -51,7 +53,8 @@ class LOUO_Dataset(Dataset):
                 feature_names: List[str] = [],
                 include_image_features: bool = False,
                 normalizer: object = None, # (normalization_object of the type['standardization', 'min-max', 'power'])
-                single_window_label: bool = False # instead of frame-wise labels, return a single label for a window
+                single_window_label: bool = False, # instead of frame-wise labels, return a single label for a window
+                sliding_window: bool = True # slide the window by 1 timestep, or jump the window by `observation_window`
             ):
         
         self.files_path = files_path
@@ -59,6 +62,7 @@ class LOUO_Dataset(Dataset):
         self.prediction_window_size = prediction_window_size
         self.target_names = class_names
         self.feature_names_ = feature_names
+        self.sliding_window = sliding_window
         self.le = preprocessing.LabelEncoder()
         self.onehot = onehot
         if onehot:
@@ -81,7 +85,6 @@ class LOUO_Dataset(Dataset):
         # feature normalization
         if normalizer:
             self.X, self.normalizer = normalize_columns(self.X, normalizer)
-
 
     def get_feature_names(self):
         return self.feature_names
@@ -108,7 +111,6 @@ class LOUO_Dataset(Dataset):
         trial_end = trial_start + self.samples_per_trial[trial_id]
         print(trial_start, trial_end, self.X.shape)
         _X = self.X[trial_start + 1 : trial_end + 1]
-        # _X_image = self.X_image[trial_start + 1 : trial_end + 1]
         _Y = self.Y[trial_start : trial_end + 1]
         if window_size > 0:
             X_image = []
@@ -119,28 +121,23 @@ class LOUO_Dataset(Dataset):
             num_windows = _X.shape[0]//window_size
             for i in range(num_windows - 1):
                 X.append(_X[i*window_size:(i+1)*window_size])
-                # X_image.append(_X_image[i*window_size:(i+1)*window_size])
                 Y.append(_Y[i*window_size:(i+1)*window_size])
                 Y_future.append(_Y[(i+1)*window_size:(i+2)*window_size])
                 P.append(_X[(i+1)*window_size:(i+2)*window_size])
-            # X_image = np.array(X_image)
             X = np.array(X)
             Y = np.array(Y)
             Y_future = np.array(Y_future)
             P = np.array(P)
         else:
             X = _X
-            # X_image = _X_image
             Y = _Y
             Y_future = np.array([])
             P = np.array([])
         X = torch.from_numpy(X).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
-        # X_image = torch.from_numpy(X_image).to(torch.float32).to(self.device) # shape [num_windows, window_size, features_dim]
         target_type = target_type = torch.float32 if self.onehot else torch.long
         Y = torch.from_numpy(Y).to(target_type).to(self.device)
         Y_future = torch.from_numpy(Y_future).to(target_type).to(self.device)
         P = torch.from_numpy(P).to(torch.float32).to(self.device)
-        # return X, X_image, Y, Y_future, P
         return X, Y, Y_future, P
 
         
@@ -186,14 +183,12 @@ class LOUO_Dataset(Dataset):
         self.target_names = self.le.classes_
         print(self.target_names)
         Y = [self.le.transform(yi) for yi in Y]
-        print(Y[0])
 
         # one-hot encoding
         if self.onehot:
             self.enc.fit(np.arange(len(self.target_names)).reshape(-1, 1))
             Y = [yi.reshape(len(yi), 1) for yi in Y]
             Y = [self.enc.transform(yi) for yi in Y]
-            print(Y[0])
         
         
         # store data inside a single 2D numpy array
@@ -205,15 +200,20 @@ class LOUO_Dataset(Dataset):
     
     def __len__(self):
         # this should return the size of the dataset
-        return self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1
+        len_ =  self.Y.shape[0] - self.observation_window_size - self.prediction_window_size
+        if not self.sliding_window:
+            len_ = math.floor(len_//self.observation_window_size)
+        return len_ + 1
     
+    # this should return one sample from the dataset
     def __getitem__(self, idx):
-        # this should return one sample from the dataset
-        features = self.X[idx + 1 : idx + self.observation_window_size + 1]
-        # image_features = self.X_image[idx + 1 : idx + self.observation_window_size + 1]
-        target = self.Y[idx : idx + self.observation_window_size + 1] # one additional observation is given for recursive decoding in recognition task
-        gesture_pred_target = self.Y[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
-        traj_pred_target = self.X[idx + self.observation_window_size + 1 : idx + self.observation_window_size + self.prediction_window_size + 1]
+        start_idx = idx + 1 if self.sliding_window else idx*self.observation_window_size + 1
+        end_index = start_idx + self.observation_window_size
+        
+        features = self.X[start_idx : end_index]
+        target = self.Y[start_idx-1 : end_index] # one additional observation is given for recursive decoding in recognition task
+        gesture_pred_target = self.Y[end_index : end_index + self.prediction_window_size]
+        traj_pred_target = self.X[end_index : end_index + self.prediction_window_size]
         
         # return kinematic_features, image_features, target, gesture_pred_target, traj_pred_target
         return features, target, gesture_pred_target, traj_pred_target
@@ -225,52 +225,47 @@ class LOUO_Dataset(Dataset):
     @staticmethod
     def collate_fn(batch, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), target_type=torch.float32, cast: bool = True):
         X = []
-        # X_image = []
         Y = []
         Future_Y = []
         P = []
-        # for x, xi, y, yy, p in batch:
         for x, y, yy, p in batch:
             X.append(x)
-            # X_image.append(xi)
             Y.append(y)
             Future_Y.append(yy)
             P.append(p)
-        # X_image = np.array(X_image)
         X = np.array(X)
         Y = np.array(Y)
-        Future_Y = np.array(Future_Y)
-        P = np.array(P)
+        try:
+            Future_Y = np.array(Future_Y)
+            P = np.array(P)
+        except:
+            Future_Y = np.array(Future_Y[:-1])
+            P = np.array(P[:-1])
 
         if cast:
             # cast to torch tensor
             x_batch = torch.from_numpy(X)
-            # xi_batch = torch.from_numpy(X_image)
             y_batch = torch.from_numpy(Y)
             yy_batch = torch.from_numpy(Future_Y)
             p_batch = torch.from_numpy(P)
             
             # cast to appropriate data type
             x_batch = x_batch.to(torch.float32)
-            # xi_batch = xi_batch.to(torch.float32)
             y_batch = y_batch.to(target_type)
             yy_batch = yy_batch.to(target_type)
             p_batch = p_batch.to(torch.float32)
 
             # cast to appropriate device
             x_batch = x_batch.to(device)
-            # xi_batch = xi_batch.to(device)
             y_batch = y_batch.to(device)
             yy_batch = yy_batch.to(device)
             p_batch = p_batch.to(device)
         else:
             x_batch = X
-            # xi_batch = X_image
             y_batch = Y
             yy_batch = Future_Y
             p_batch = P
 
-        # return (x_batch, xi_batch, y_batch, yy_batch, p_batch)
         return (x_batch, y_batch, yy_batch, p_batch)
 
 

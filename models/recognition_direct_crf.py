@@ -10,6 +10,7 @@ import numpy as np
 import torch.optim as optim
 
 from .utils import *
+from torch.optim.lr_scheduler import LambdaLR
 
 
     
@@ -177,9 +178,12 @@ class Trainer:
         elif optimizer_type == 'AdamW':
             optimizer_cls = torch.optim.AdamW
         optimizer = optimizer_cls(model.parameters(), lr=lr, weight_decay=weight_decay)
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: 0.9 ** (epoch // 10), verbose=True)
 
         val_loss = 0
         best_val_loss = 1e4
+
+        accuracies, edit_scores = [], []
         
         for epoch in range(epochs):
             train_losses = []
@@ -197,6 +201,7 @@ class Trainer:
                 #     epoch+1, epochs, loss, val_loss))
                 losses.append([epoch, bi, loss.item(), np.nan])
                 train_losses.append(loss.item())
+            # scheduler.step()    
             # def moving_average(x, w):
             #     return np.convolve(x, np.ones(w), 'valid') / w
             # plt.plot(moving_average(train_losses, 10))
@@ -205,7 +210,9 @@ class Trainer:
             val_loss = self.__eval_model(model, device, dataloader=valid_dataloader, desc="eval").item()
             print("Training Loss: ", np.mean(train_losses))
             print("Validation Loss: ", val_loss)
-            self._compute_metrics(valid_dataloader, model)
+            accuracy, edit_score = self._compute_metrics(valid_dataloader, model)
+            accuracies.append(accuracy)
+            edit_scores.append(edit_score)
             # save losses
             losses[-1][-1] = val_loss
             self.__save_loss(losses, loss_path)
@@ -216,10 +223,10 @@ class Trainer:
                 model_path = os.path.join(model_dir, 'model.pth')
                 self.__save_model(model_path, model)
                 print("save model(epoch: {}) => {}".format(epoch, loss_path))
-        print("\n\nFINAL VAL LOSS: {}")
-        self._compute_metrics(valid_dataloader, model)
+        print(f"\n\nFINAL VAL LOSS: {val_loss}")
+        accuracy, edit_score = self._compute_metrics(valid_dataloader, model)
         print("\n\n\n")
-        return val_loss
+        return max(accuracies), max(edit_scores), val_loss
 
     def _compute_metrics(self, valid_dataloader, model):
         pred, gt = list(), list()
@@ -235,5 +242,6 @@ class Trainer:
         pred, gt = np.concatenate(pred), np.concatenate(gt)
         print('pred: ', pred)
         print('gt: ', gt)
-        get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names())
+        accuracy, edit_score, report = get_classification_report(pred, gt, valid_dataloader.dataset.get_target_names())
+        return accuracy, edit_score
         

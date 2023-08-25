@@ -7,8 +7,9 @@ import numpy as np
 import pandas as pd
 from timeit import default_timer as timer
 from utils import get_dataloaders
-from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, class_names, all_class_names, state_variables
+from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_no_rot_ps, class_names, all_class_names, state_variables
 from models.utils import plot_bars
+from models.recognition_direct_crf import Trainer as CRF_Trainer
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -18,25 +19,26 @@ warnings.filterwarnings('ignore')
 ### -------------------------- DATA -----------------------------------------------------
 tasks = ["Suturing"]
 Features = kinematic_feature_names_jigsaws[38:] + state_variables #kinematic features + state variable features
+# Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
 
 one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 10
 prediction_window = 10
 batch_size = 64
-user_left_out = 2
+subject_id_to_exclude = 2
 cast = True
 include_image_features = False
 normalizer = '' # ('standardization', 'min-max', 'power', '')
-step = 6 # 5 Hz
+step = 3 # 5 Hz
 
-for user_left_out in [2, 3, 4, 5, 6, 7, 8, 9]:
-    train_dataloader, valid_dataloader = get_dataloaders(tasks,
-                                                        user_left_out,
-                                                        observation_window,
-                                                        prediction_window,
-                                                        batch_size,
-                                                        one_hot,
+for subject_id_to_exclude in [2, 3, 4, 5, 6, 7, 8, 9]:
+    train_dataloader, valid_dataloader = get_dataloaders(tasks=tasks,
+                                                        subject_id_to_exclude=subject_id_to_exclude,
+                                                        observation_window=observation_window,
+                                                        prediction_window=prediction_window,
+                                                        batch_size=batch_size,
+                                                        one_hot=one_hot,
                                                         class_names = class_names['Suturing'],
                                                         feature_names = Features,
                                                         include_image_features = include_image_features,
@@ -65,7 +67,7 @@ for user_left_out in [2, 3, 4, 5, 6, 7, 8, 9]:
 
 
     ### -------------------------- Model -----------------------------------------------------
-    from models.recognition_direct_crf import Trainer as CRF_Trainer
+    
 
     # import optuna
     # import math
@@ -105,12 +107,12 @@ for user_left_out in [2, 3, 4, 5, 6, 7, 8, 9]:
         
     #     users = list(range(2, 9 + 1)) 
     #     val_losses = list()
-    #     for user_left_out in users:
-    #         print("Training and Validation for user: ", user_left_out)
+    #     for subject_id_to_exclude in users:
+    #         print("Training and Validation for user: ", subject_id_to_exclude)
             
     #     # Load your data and define loss function here
     #         train_dataloader, valid_dataloader = get_dataloaders(tasks,
-    #                                                         user_left_out,
+    #                                                         subject_id_to_exclude,
     #                                                         observation_window,
     #                                                         prediction_window,
     #                                                         batch_size,
@@ -182,8 +184,12 @@ for user_left_out in [2, 3, 4, 5, 6, 7, 8, 9]:
     epochs = 20
     model_dir = 'saved_model_files'
 
+    results = {}
+
     trainer = CRF_Trainer()
-    trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
+    accuracy, edit_score, loss = trainer.train_and_evaluate(train_dataloader, valid_dataloader, epochs, model_dir, args, device)
+    results[f"S{subject_id_to_exclude}"] = (accuracy, edit_score)
+print(results)
 
 
 

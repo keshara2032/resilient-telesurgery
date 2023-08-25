@@ -182,11 +182,12 @@ def get_classification_report(pred, gt, target_names):
 
     pd.DataFrame(report).transpose().to_csv("metrics.csv")
     accuracy = np.mean(pred == gt)
+    edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(pred))
     print('Accuracy: ', accuracy)
-    print('Edit Score: ', compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(pred)))
+    print('Edit Score: ', edit_score)
 
 
-    return pd.DataFrame(report).transpose()
+    return accuracy, edit_score, pd.DataFrame(report).transpose()
 
 def merge_gesture_sequence(seq):
     import itertools
