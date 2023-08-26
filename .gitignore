@@ -3,6 +3,10 @@
 dataset/
 new_dataset/
 
+*.csv#
+ProcessedDatasets/
+
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -199,7 +199,8 @@ class LOUO_Dataset(Dataset):
     def __len__(self):
         # this should return the size of the dataset
         # return self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1
-        return int((self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1)/self.observation_window_size)
+        return int((self.Y.shape[0] - self.observation_window_size - self.prediction_window_size - 1)//self.observation_window_size)
+        
         
     
     def __getitem__(self, idx):

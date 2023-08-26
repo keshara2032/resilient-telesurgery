@@ -42,6 +42,14 @@ kinematic_feature_names_jigsaws = ["MTML_position_x", "MTML_position_y", "MTML_p
                                         "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z",
                                         "PSMR_velocity_rot0", "PSMR_velocity_rot1", "PSMR_velocity_rot2",
                                         "PSMR_gripper_angle"]
+
+kinematic_feature_names_jigsaws_patient_position = ["PSML_position_x", "PSML_position_y", "PSML_position_z",
+                                        "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z",
+                                        "PSML_gripper_angle", 
+                                        "PSMR_position_x", "PSMR_position_y", "PSMR_position_z",
+                                        "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z",
+                                        "PSMR_gripper_angle"]
+
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
 state_variables_repeating_factor = 10
 
@@ -118,5 +126,3 @@ if __name__ == "__main__":
     task = sys.argv[1]
     assert(task in all_tasks)
     generate_data(task)
-
-
