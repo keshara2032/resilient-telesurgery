@@ -67,19 +67,34 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
 
             y_pred = model(src)  # [64,10]
 
+            # threshold = 0.5
+            # by_pred = (y_pred > threshold).int()
+
+  
+            # ypreds.append(y_pred)
+            # gts.append(y)
+
+
+            # input()
+
             pred = torch.argmax(y_pred, dim=-1)
             gt = torch.argmax(y, dim=-1)  # maxpool
             # gt = torch.argmax(tgt,dim=-1)
 
+            # print(y_pred.shape, y.shape,pred.shape, gt.shape)
             pred = pred.cpu().numpy()
             gt = gt.cpu().numpy()
 
-            ypreds.append(pred.reshape(-1))
-            gts.append(gt.reshape(-1))
+            ypreds.append(pred)
+            gts.append(gt)
 
-            loss = criterion(y_pred, y)
+            loss = criterion(y_pred, y) # maxpool
+            # loss = criterion(y_pred, y)
 
             losses.append(loss.item())
+
+
+        # accuracy = calc_accuracy(ypreds, gts)
 
         ypreds = np.concatenate(ypreds)
         gts = np.concatenate(gts)
@@ -100,6 +115,7 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
 
 # train loop, calls evaluation every epoch
 def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader):
+
 
     accuracy = 0
     total_accuracy = []
@@ -123,20 +139,22 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
 
             y = find_mostcommon(tgt, device)
 
-
+   
             y_pred = model(src)  # [64,10]
             # print('input, prediction, yseq, gt:',src.shape, y_pred.shape,  y.shape, tgt.shape)
             # input()
             
+  
             loss = criterion(y_pred, y)  # for maxpool
             # loss = criterion(y_pred, tgt)
             loss.backward()
 
-            optimizer.step()
 
             running_loss += loss.item()
-
-        # scheduler.step(running_loss)
+            
+            optimizer.step()
+            
+        scheduler.step(running_loss)
 
         print(
             f"Training Epoch {epoch+1}, Loss: {running_loss / len(train_dataloader):.6f}")
@@ -148,3 +166,22 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
         total_accuracy.append(accuracy)
 
     return val_loss, accuracy, total_accuracy
+
+
+
+def calc_accuracy(pred, gt):
+    
+    pred = torch.cat(pred, dim=0)
+    gt = torch.cat(gt, dim=0)
+
+    correct_predictions = torch.sum(gt == pred)
+    total_predictions = gt.numel()  # Total number of elements in the tensor
+
+    accuracy = correct_predictions.item() / total_predictions
+
+
+    print("Correct predictions:", correct_predictions.item())
+    print("Total predictions:", total_predictions)
+    print("Accuracy:", accuracy)
+    
+    return accuracy

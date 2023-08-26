@@ -45,12 +45,12 @@ transformer_params = {
     "layer_dim": 4,
     "encoder_params": {
         "in_channels": 14,
-        "kernel_size": 59,
+        "kernel_size": 61,
         "out_channels": 128,
                        },
     "decoder_params": {
         "in_channels": 128,
-        "kernel_size": 59,
+        "kernel_size": 61,
         "out_channels": 64
     }
 }
@@ -67,7 +67,7 @@ dataloader_params = {
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "observation_window": 32,
-    "prediction_window": 10,
+    "prediction_window": 32,
     "batch_size": 10,
     "user_left_out": 2,
     "cast": True,
