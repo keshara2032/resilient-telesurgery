@@ -4,8 +4,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
 
+    
+import os
+from functools import partial
+import torch
 
-from dataset import LOUO_Dataset
+from torch.utils.data import DataLoader
+from .dataset import LOUO_Dataset
+from .datagen import all_tasks
+    
+from .dataset import LOUO_Dataset
 
 def get_normalizer(normalization_type):
     if normalization_type == 'standardization':
@@ -30,16 +38,7 @@ def get_dataloaders(tasks: List[str],
                     cast: bool,
                     normalizer: str,
                     step: int = -1):
-    
-    from typing import List
-    import os
-    from functools import partial
-    import torch
 
-    from torch.utils.data import DataLoader
-    from dataset import LOUO_Dataset
-    from datagen import all_tasks
-    
 
     def _get_files_except_user(task, data_path, subject_id_to_exclude: int) -> List[str]:
         assert(task in all_tasks)

@@ -46,7 +46,7 @@ def find_mostcommon(tensor, device):
     return batch_y_bin
 
 # evaluation loop (supports both window wise and frame wise)
-def eval_loop(model, test_dataloader, criterion):
+def eval_loop(model, test_dataloader, criterion, dataloader):
     model.eval()
     with torch.no_grad():
         # eval
@@ -54,7 +54,14 @@ def eval_loop(model, test_dataloader, criterion):
         ypreds, gts = [], []
 
         for src, tgt, future_gesture, future_kinematics in test_dataloader:
-            src = src
+            
+            if(dataloader == "kw"):
+                src = src.to(torch.float32)
+                src = src.to(device)
+                
+                tgt = tgt.to(torch.float32)
+                tgt = tgt.to(device)  
+                
             tgt = tgt[:, 1:, :]
             y = find_mostcommon(tgt, device)
 
@@ -67,8 +74,8 @@ def eval_loop(model, test_dataloader, criterion):
             pred = pred.cpu().numpy()
             gt = gt.cpu().numpy()
 
-            ypreds.append(pred)
-            gts.append(gt)
+            ypreds.append(pred.reshape(-1))
+            gts.append(gt.reshape(-1))
 
             loss = criterion(y_pred, y)
 
@@ -92,7 +99,7 @@ def eval_loop(model, test_dataloader, criterion):
         return np.mean(losses), accuracy
 
 # train loop, calls evaluation every epoch
-def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs):
+def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader):
 
     accuracy = 0
     total_accuracy = []
@@ -104,14 +111,23 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
 
             optimizer.zero_grad()
 
-            src = src
-            y = find_mostcommon(tgt[:, 1:, :], device)
-
+            if(dataloader == "kw"):
+                src = src.to(torch.float32)
+                src = src.to(device)
+                
+                tgt = tgt.to(torch.float32)
+                tgt = tgt.to(device)  
+             
             tgt = tgt[:, 1:, :]
+            
+
+            y = find_mostcommon(tgt, device)
+
 
             y_pred = model(src)  # [64,10]
-            # print('input, prediction,gt:',src.shape, y_pred.shape,  y.shape, tgt.shape)
-
+            # print('input, prediction, yseq, gt:',src.shape, y_pred.shape,  y.shape, tgt.shape)
+            # input()
+            
             loss = criterion(y_pred, y)  # for maxpool
             # loss = criterion(y_pred, tgt)
             loss.backward()
@@ -126,7 +142,7 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             f"Training Epoch {epoch+1}, Loss: {running_loss / len(train_dataloader):.6f}")
 
         # evaluation loop
-        val_loss, accuracy = eval_loop(model, test_dataloader, criterion)
+        val_loss, accuracy = eval_loop(model, test_dataloader, criterion, dataloader)
         print(f"Valdiation Epoch {epoch+1}, Loss: {val_loss:.6f}")
 
         total_accuracy.append(accuracy)

@@ -68,7 +68,7 @@ dataloader_params = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "observation_window": 32,
     "prediction_window": 10,
-    "batch_size": 64,
+    "batch_size": 10,
     "user_left_out": 2,
     "cast": True,
     "include_image_features": False,
