@@ -101,13 +101,13 @@ class TransformerModel(nn.Module):
             nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout), num_layers=num_layers
         )
         
-        self.lstm = LSTMModel(2*d_model, hidden_dim, layer_dim, int(2*d_model))
+        # self.lstm = LSTMModel(2*d_model, hidden_dim, layer_dim, int(2*d_model))
        
         self.encoder = CNN_Encoder(**encoder_params)
         self.decoder = CNN_Decoder(**decoder_params)
         
         self.max_pool = GlobalMaxPooling1D()
-        self.fc = nn.Linear(input_dim, 2*d_model)
+        # self.fc = nn.Linear(input_dim, 2*d_model)
         # self.out = nn.Linear(int(d_model/2), output_dim)
         self.out = nn.Linear(d_model, output_dim) # vanilla + gru
         

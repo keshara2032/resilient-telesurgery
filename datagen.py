@@ -53,7 +53,7 @@ kinematic_feature_names_jigsaws_patient_position = ["PSML_position_x", "PSML_pos
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
 state_variables_repeating_factor = 10
 
-image_features_save_path = './image_features'
+image_features_save_path = './ImageFeatures'
 
 def generate_data(task: str):
     processed_data_path = "./ProcessedDatasets"

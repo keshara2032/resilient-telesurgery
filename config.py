@@ -1,5 +1,8 @@
 import torch
 
+
+RECORD_RESULTS = True
+
 tcn_model_params = {
     "class_num": 7,
     "decoder_params": {
@@ -61,10 +64,9 @@ learning_params = {
 
 dataloader_params = {
     "batch_size": 10,
-    "seq_len": 32,
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "observation_window": 10,
+    "observation_window": 32,
     "prediction_window": 10,
     "batch_size": 64,
     "user_left_out": 2,

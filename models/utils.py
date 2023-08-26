@@ -1,6 +1,6 @@
-
-from transtcn import *
-from compasstcn import *
+from .transtcn import *
+from .compasstcn import *
+import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 import numpy as np
@@ -13,7 +13,7 @@ def initiate_model(input_dim, output_dim, transformer_params, learning_params, t
 
     d_model, nhead, num_layers, hidden_dim, layer_dim, encoder_params, decoder_params = transformer_params.values()
 
-    lr, epochs, weight_decay, patience, batch_size, seq_len = learning_params.values()
+    lr, epochs, weight_decay, patience = learning_params.values()
 
     if (model == 'transformer'):
         model = TransformerModel(input_dim=input_dim, output_dim=output_dim, d_model=d_model, nhead=nhead, num_layers=num_layers,

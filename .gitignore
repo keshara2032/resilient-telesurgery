@@ -5,7 +5,7 @@ new_dataset/
 
 *.csv#
 ProcessedDatasets/
-
+ImageFeatures/
 .vscode/
 
 # Byte-compiled / optimized / DLL files

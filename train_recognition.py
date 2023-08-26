@@ -21,7 +21,9 @@ from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, ki
 from tqdm import tqdm
 from collections import OrderedDict
 from config import *
-
+from models.utils import *
+from models.transtcn import *
+from models.compasstcn import *
 
 # end of imports #
 
@@ -32,6 +34,7 @@ torch.manual_seed(0)
 
 # tasks and features to be included
 tasks = ["Suturing"]
+
 # Features = kinematic_feature_names_jigsaws[38:] + state_variables #all patient side kinematic features + state variable features
 # Features = kinematic_feature_names_jigsaws[0:]  #all patient side kinematic features + state variable features
 # Features = kinematic_feature_names_jigsaws_patient_position + state_variables #kinematic features + state variable features
@@ -66,3 +69,59 @@ print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
 print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
 print("Features: ", train_dataloader.dataset.get_feature_names())
 
+epochs = learning_params["epochs"]
+observation_window = dataloader_params["observation_window"],
+
+
+batch = next(iter(train_dataloader))
+features = batch[0].shape[-1]
+output_dim = batch[1].shape[-1]
+input_dim = features  
+
+print("Input Features:",input_dim, "Output Classes:",output_dim)
+
+
+### DEFINE MODEL HERE ###
+# model = 'tcn' 
+model = 'transformer'
+
+model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model)
+
+print(model)
+
+
+### Subjects 
+subjects = [2,3,4,5,6,7,8,9]
+accuracy = []
+
+
+# Train Loop
+for subject in (subjects):
+
+        model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model)
+        user_left_out = subject
+
+        train_dataloader, valid_dataloader = get_dataloaders(tasks,
+                                                     dataloader_params["user_left_out"],
+                                                     dataloader_params["observation_window"],
+                                                     dataloader_params["prediction_window"],
+                                                     dataloader_params["batch_size"],
+                                                     dataloader_params["one_hot"],
+                                                     class_names = class_names['Suturing'],
+                                                     feature_names = Features,
+                                                     include_image_features=dataloader_params["include_image_features"],
+                                                     cast = dataloader_params["cast"],
+                                                     normalizer = dataloader_params["normalizer"],
+                                                     step=dataloader_params["step"])
+
+
+        val_loss,acc, all_acc = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs)
+        
+        accuracy.append({'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc)})
+
+
+if(RECORD_RESULTS):
+    with open("results.json", "w") as outfile:
+        json_object = json.dumps(accuracy, indent=4)
+        outfile.write(json_object)
+             
