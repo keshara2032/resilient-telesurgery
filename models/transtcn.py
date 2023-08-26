@@ -110,7 +110,6 @@ class TransformerModel(nn.Module):
         # self.fc = nn.Linear(input_dim, 2*d_model)
         # self.out = nn.Linear(int(d_model/2), output_dim)
         self.out = nn.Linear(d_model, output_dim) # vanilla + gru
-        self.relu = nn.ReLU()
         
     # tcn + transformer
     def forward(self, x):
@@ -126,9 +125,6 @@ class TransformerModel(nn.Module):
         x = self.max_pool(x) # gets rid of seq_len
 
         x = self.out(x)
-        
-        x = self.relu(x)
-        
         
         return x
         

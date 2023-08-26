@@ -25,7 +25,9 @@ from models.utils import *
 from models.transtcn import *
 from models.compasstcn import *
 from datautils.dataloader_k import *
+from genutils.utils import *
 
+import datetime
 import argparse
 
 # end of imports #
@@ -43,14 +45,15 @@ parser.add_argument("--dataloader", help="Specify which dataloader", required=Tr
 args = parser.parse_args()
 
 # Access the parsed arguments
-model = args.model
+model_name = args.model
 dataloader = args.dataloader
 # verbose_mode = args.verbose
 
 
 
 # manual seeding ensure reproducibility
-torch.manual_seed(0)
+# torch.manual_seed(0)
+
 
 
 # tasks and features to be included
@@ -111,13 +114,15 @@ print("Input Features:",input_dim, "Output Classes:",output_dim)
 # model = 'tcn' 
 # model = 'transformer'
 
-model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model)
+model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model_name)
 
 print(model)
 
 
 ### Subjects 
 subjects = [2,3,4,5,6,7,8,9]
+# subjects = [2]
+
 accuracy = []
 
 print("len dataloader:",train_dataloader.dataset.__len__())
@@ -125,7 +130,7 @@ input("Press any key to train...")
 # Train Loop
 for subject in (subjects):
 
-        model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model)
+        model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model_name)
         user_left_out = subject
 
         if(dataloader == "kw"):
@@ -151,7 +156,15 @@ for subject in (subjects):
 
 
 if(RECORD_RESULTS):
-    with open("results.json", "w") as outfile:
+    with open("./results/results.json", "w") as outfile:
         json_object = json.dumps(accuracy, indent=4)
         outfile.write(json_object)
-             
+        
+    current_datetime = datetime.datetime.now()
+
+    # Format the datetime as a string to be used as a filename
+    formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+
+    csv_name = f'{task}_{model_name}_{formatted_datetime}_num_features{len(Features)}_LOUO_window{dataloader_params["observation_window"]}.csv'
+         
+    json_to_csv(csv_name)    

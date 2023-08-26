@@ -15,6 +15,7 @@ def initiate_model(input_dim, output_dim, transformer_params, learning_params, t
 
     lr, epochs, weight_decay, patience = learning_params.values()
 
+    
     if (model == 'transformer'):
         model = TransformerModel(input_dim=input_dim, output_dim=output_dim, d_model=d_model, nhead=nhead, num_layers=num_layers,
                                  hidden_dim=hidden_dim, layer_dim=layer_dim, encoder_params=encoder_params, decoder_params=decoder_params)
@@ -62,7 +63,6 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
                 tgt = tgt.to(torch.float32)
                 tgt = tgt.to(device)  
                 
-            tgt = tgt[:, 1:, :]
             y = find_mostcommon(tgt, device)
 
             y_pred = model(src)  # [64,10]
@@ -134,8 +134,6 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
                 tgt = tgt.to(torch.float32)
                 tgt = tgt.to(device)  
              
-            tgt = tgt[:, 1:, :]
-            
 
             y = find_mostcommon(tgt, device)
 

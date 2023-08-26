@@ -39,26 +39,26 @@ tcn_model_params = {
 
 transformer_params = {
     "d_model": 64,
-    "nhead": 8,
+    "nhead": 16,
     "num_layers": 2,
     "hidden_dim": 128,
     "layer_dim": 4,
     "encoder_params": {
         "in_channels": 14,
-        "kernel_size": 61,
+        "kernel_size": 7,
         "out_channels": 128,
                        },
     "decoder_params": {
         "in_channels": 128,
-        "kernel_size": 61,
+        "kernel_size": 7,
         "out_channels": 64
     }
 }
 
 learning_params = {
-    "lr": 8.906324028628413e-05,
+    "lr": 8.906324028628413e-5,
     "epochs": 30,
-    "weight_decay": 1e5,
+    "weight_decay": 1e-5,
     "patience": 3
 }
 
