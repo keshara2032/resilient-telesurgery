@@ -3,6 +3,9 @@
 dataset/
 new_dataset/
 
+ProcessedDatasets/*
+results/*.csv
+
 *.csv#
 ProcessedDatasets/
 ImageFeatures/

@@ -2,13 +2,15 @@ import json
 import csv
 
 data = []
-# Read JSON data from file
-with open('results/results.json', 'r') as json_file:
-    data = json.load(json_file)
 
 
 def json_to_csv(csv_file):
-    # Write CSV data
+    
+    # Read JSON data from file
+    with open('results/results.json', 'r') as json_file:
+        data = json.load(json_file)
+
+
     csv_path = f'results/{csv_file}'
     with open(csv_path, 'w', newline='') as csv_file:
         csv_writer = csv.DictWriter(csv_file, fieldnames=data[0].keys())
@@ -21,3 +23,4 @@ def json_to_csv(csv_file):
 
     print(f'Data written to {csv_path}')
     
+

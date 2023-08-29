@@ -7,7 +7,7 @@ tcn_model_params = {
     "class_num": 7,
     "decoder_params": {
         "input_size": 128,
-        "kernel_size": 29,
+        "kernel_size": 61,
         "layer_sizes": [
             96,
             64,
@@ -19,7 +19,7 @@ tcn_model_params = {
     },
     "encoder_params": {
         "input_size": 25,
-        "kernel_size": 29,
+        "kernel_size": 61,
         "layer_sizes": [
             64,
             96,
@@ -39,25 +39,27 @@ tcn_model_params = {
 
 transformer_params = {
     "d_model": 64,
-    "nhead": 16,
-    "num_layers": 2,
-    "hidden_dim": 128,
+    "nhead": 32,
+    "num_layers": 4,
+    "hidden_dim": 64,
     "layer_dim": 4,
     "encoder_params": {
         "in_channels": 14,
-        "kernel_size": 7,
-        "out_channels": 128,
+        "kernel_size": 29,
+        "out_channels": 64,
                        },
     "decoder_params": {
-        "in_channels": 128,
-        "kernel_size": 7,
+        "in_channels": 64,
+        "kernel_size": 29,
         "out_channels": 64
-    }
+    },
+    "context":2 #0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context
 }
 
 learning_params = {
     "lr": 8.906324028628413e-5,
-    "epochs": 30,
+    # "lr": 1e-6,
+    "epochs": 10,
     "weight_decay": 1e-5,
     "patience": 3
 }
@@ -67,11 +69,10 @@ dataloader_params = {
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "observation_window": 32,
-    "prediction_window": 32,
-    "batch_size": 10,
+    "prediction_window": 10,
     "user_left_out": 2,
     "cast": True,
     "include_image_features": False,
     "normalizer": '',  # ('standardization', 'min-max', 'power', '')
-    "step": 1,  # 1 - 30 Hz
+    "step": 2,  # 1 - 30 Hz
 }

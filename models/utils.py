@@ -5,22 +5,28 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 import numpy as np
 from tqdm import tqdm
+import pandas as pd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def reset_parameters(module):
+    if isinstance(module, nn.Linear):
+        module.reset_parameters()
 
-def initiate_model(input_dim, output_dim, transformer_params, learning_params, tcn_model_params, model):
 
-    d_model, nhead, num_layers, hidden_dim, layer_dim, encoder_params, decoder_params = transformer_params.values()
+def initiate_model(input_dim, output_dim, transformer_params, learning_params, tcn_model_params, model_name):
+
+    d_model, nhead, num_layers, hidden_dim, layer_dim, encoder_params, decoder_params, context = transformer_params.values()
 
     lr, epochs, weight_decay, patience = learning_params.values()
 
-    
-    if (model == 'transformer'):
+    if (model_name == 'transformer'):
+        print("Creating Transformer")
         model = TransformerModel(input_dim=input_dim, output_dim=output_dim, d_model=d_model, nhead=nhead, num_layers=num_layers,
                                  hidden_dim=hidden_dim, layer_dim=layer_dim, encoder_params=encoder_params, decoder_params=decoder_params)
 
-    elif (model == 'tcn'):
+    elif (model_name == 'tcn'):
+        print("Creating TCN")
         model = TCN(input_dim=input_dim, output_dim=output_dim,
                     tcn_model_params=tcn_model_params)
 
@@ -28,7 +34,8 @@ def initiate_model(input_dim, output_dim, transformer_params, learning_params, t
 
     # Define the optimizer (Adam optimizer with weight decay)
     optimizer = optim.Adam(model.parameters(), lr=lr,
-                           weight_decay=weight_decay)
+                           weight_decay=weight_decay, betas=(0.9,0.98), eps=1e-9)
+
 
     # Define the learning rate scheduler (ReduceLROnPlateau scheduler)
     scheduler = ReduceLROnPlateau(
@@ -49,11 +56,17 @@ def find_mostcommon(tensor, device):
 # evaluation loop (supports both window wise and frame wise)
 def eval_loop(model, test_dataloader, criterion, dataloader):
     model.eval()
+    
+    
     with torch.no_grad():
         # eval
         losses = []
         ypreds, gts = [], []
-
+        accuracy = 0
+        n_batches = len(test_dataloader)
+        
+        nypreds,ngts = [],[]
+        
         for src, tgt, future_gesture, future_kinematics in test_dataloader:
             
             if(dataloader == "kw"):
@@ -63,17 +76,19 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
                 tgt = tgt.to(torch.float32)
                 tgt = tgt.to(device)  
                 
-            y = find_mostcommon(tgt, device)
+            y = find_mostcommon(tgt, device) #maxpool
+            # y = tgt
+
 
             y_pred = model(src)  # [64,10]
 
-            # threshold = 0.5
+            # threshold = 0.6
             # by_pred = (y_pred > threshold).int()
-
+            # nypreds.append(by_pred)
+            # ngts.append(y)
   
             # ypreds.append(y_pred)
             # gts.append(y)
-
 
             # input()
 
@@ -92,23 +107,25 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
             # loss = criterion(y_pred, y)
 
             losses.append(loss.item())
+            
+            accuracy += np.mean(pred == gt)
 
 
-        # accuracy = calc_accuracy(ypreds, gts)
+        # myaccuracy = calc_accuracy(nypreds, ngts)
+        # print("My Accuracy:",myaccuracy)
+        # ypreds = np.concatenate(ypreds)
+        # gts = np.concatenate(gts)
 
-        ypreds = np.concatenate(ypreds)
-        gts = np.concatenate(gts)
+        # # get_classification_report(ypreds,gts,test_dataloader.dataset.get_target_names())
 
-        # get_classification_report(ypreds,gts,test_dataloader.dataset.get_target_names())
+        # # Compare each element and count matches
+        # matches = np.sum(ypreds == gts)
 
-        # Compare each element and count matches
-        matches = np.sum(ypreds == gts)
+        # print('evaluation:', ypreds.shape, gts.shape, matches)
 
-        print('evaluation:', ypreds.shape, gts.shape, matches)
-
-        # Calculate accuracy
-        accuracy = matches / len(ypreds)
-
+        # # Calculate accuracy
+        # accuracy = matches / len(ypreds)
+        accuracy = accuracy/n_batches
         print("Accuracy:", accuracy)
 
         return np.mean(losses), accuracy
@@ -135,8 +152,8 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
                 tgt = tgt.to(device)  
              
 
-            y = find_mostcommon(tgt, device)
-
+            y = find_mostcommon(tgt, device) #maxpool
+            # y = tgt
    
             y_pred = model(src)  # [64,10]
             # print('input, prediction, yseq, gt:',src.shape, y_pred.shape,  y.shape, tgt.shape)
@@ -147,7 +164,6 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             # loss = criterion(y_pred, tgt)
             loss.backward()
 
-
             running_loss += loss.item()
             
             optimizer.step()
@@ -155,11 +171,11 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
         scheduler.step(running_loss)
 
         print(
-            f"Training Epoch {epoch+1}, Loss: {running_loss / len(train_dataloader):.6f}")
+            f"Training Epoch {epoch+1}, Training Loss: {running_loss / len(train_dataloader):.6f}")
 
         # evaluation loop
         val_loss, accuracy = eval_loop(model, test_dataloader, criterion, dataloader)
-        print(f"Valdiation Epoch {epoch+1}, Loss: {val_loss:.6f}")
+        print(f"Valdiation Epoch {epoch+1}, Validation Loss: {val_loss:.6f}")
 
         total_accuracy.append(accuracy)
 

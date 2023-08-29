@@ -51,6 +51,9 @@ kinematic_feature_names_jigsaws_patient_position = ["PSML_position_x", "PSML_pos
                                         "PSMR_gripper_angle"]
 
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
+
+img_features = ["img_" + str(i) for i in range(2048)]
+
 state_variables_repeating_factor = 10
 
 image_features_save_path = './ImageFeatures'

@@ -11,8 +11,19 @@ class GlobalMaxPooling1D(nn.Module):
         self.step_axis = 1 if self.data_format == 'channels_last' else 2
 
     def forward(self, input):
+        
         return torch.max(input, axis=self.step_axis).values
     
+class ChannelNorm(nn.Module):
+    def __init__(self):
+        super(ChannelNorm, self).__init__()
+
+    def forward(self, x): #(batch, feature, seq)
+        divider = torch.max(torch.max(torch.abs(x), dim=0)[0], dim=1)[0] + 1e-5
+        divider = divider.unsqueeze(0).unsqueeze(2)
+        divider = divider.repeat(x.size(0), 1, x.size(2))
+        x = x / divider
+        return x    
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
@@ -53,13 +64,13 @@ class CNN_Encoder(nn.Module):
         super(CNN_Encoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Conv1d(in_channels=in_channels, out_channels=96, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
+            nn.Conv1d(in_channels=in_channels, out_channels=64, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride = 2),
-            nn.Conv1d(in_channels=96, out_channels=128, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
+            nn.Conv1d(in_channels=64, out_channels=96, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride = 2),
-            nn.Conv1d(in_channels=128, out_channels=out_channels, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
+            nn.Conv1d(in_channels=96, out_channels=out_channels, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride = 2)
         )
@@ -95,36 +106,45 @@ class CNN_Decoder(nn.Module):
     
 class TransformerModel(nn.Module):
     
-    def __init__(self, input_dim, output_dim, d_model, nhead, num_layers, hidden_dim, layer_dim,encoder_params, decoder_params,dropout=0.1):
+    def __init__(self, input_dim, output_dim, d_model, nhead, num_layers, hidden_dim, layer_dim,encoder_params, decoder_params,dropout=0.01):
         super().__init__()
         self.transformer = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout), num_layers=num_layers
+
         )
         
-        # self.lstm = LSTMModel(2*d_model, hidden_dim, layer_dim, int(2*d_model))
+        # self.lstm = LSTMModel(d_model, hidden_dim, layer_dim, output_dim)
+       
+        encoder_params["in_channels"] = input_dim
+        decoder_params["out_channels"] = output_dim
        
         self.encoder = CNN_Encoder(**encoder_params)
         self.decoder = CNN_Decoder(**decoder_params)
         
         self.max_pool = GlobalMaxPooling1D()
-        # self.fc = nn.Linear(input_dim, 2*d_model)
+        self.fc = nn.Linear(input_dim, d_model)
         # self.out = nn.Linear(int(d_model/2), output_dim)
         self.out = nn.Linear(d_model, output_dim) # vanilla + gru
         
     # tcn + transformer
     def forward(self, x):
         
-        x = self.encoder(x)
         
-        x = self.decoder(x)
+        x = self.encoder(x)
         
         x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
         x = self.transformer(x)
         
+        x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
+        
+        x = self.decoder(x)
+        
+        x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
+        
         x = self.max_pool(x) # gets rid of seq_len
 
-        x = self.out(x)
+        # x = self.out(x)
         
         return x
         

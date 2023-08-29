@@ -30,6 +30,10 @@ from genutils.utils import *
 import datetime
 import argparse
 
+
+torch.manual_seed(0)
+
+
 # end of imports #
 
 
@@ -57,14 +61,31 @@ dataloader = args.dataloader
 
 
 # tasks and features to be included
-task = "Suturing"
+task = ["Suturing",""]
 
-# Features = kinematic_feature_names_jigsaws[38:] + state_variables #all patient side kinematic features + state variable features
-# Features = kinematic_feature_names_jigsaws[0:]  #all patient side kinematic features + state variable features
-# Features = kinematic_feature_names_jigsaws_patient_position + state_variables #kinematic features + state variable features
-Features = kinematic_feature_names_jigsaws_patient_position  #kinematic features only
+context = transformer_params["context"]
 
 
+if(context == 0): #kin only
+    # Features = kinematic_feature_names_jigsaws[38:]  #all patient side kinematic features
+    Features = kinematic_feature_names_jigsaws_patient_position  #kinematic features only
+    # Features = kinematic_feature_names_jigsaws[0:]  #all  kinematic features 
+    
+elif(context == 1): #context only
+    Features = state_variables
+
+elif(context == 2): # context + kin
+    # Features = kinematic_feature_names_jigsaws[38:] + state_variables #all patient side kinematic features + state variable features
+    Features = kinematic_feature_names_jigsaws_patient_position + state_variables #kinematic features + state variable features
+
+elif(context == 3): # img features only
+    Features = img_features 
+    
+elif(context == 4): # img features + kin
+    Features = img_features + kinematic_feature_names_jigsaws_patient_position
+    
+elif(context == 5): # img features + kin + context
+    Features = img_features + kinematic_feature_names_jigsaws_patient_position + state_variables
 
 epochs = learning_params["epochs"]
 observation_window = dataloader_params["observation_window"],
@@ -114,45 +135,52 @@ print("Input Features:",input_dim, "Output Classes:",output_dim)
 # model = 'tcn' 
 # model = 'transformer'
 
-model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model_name)
+model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
 
 print(model)
 
 
 ### Subjects 
 subjects = [2,3,4,5,6,7,8,9]
-# subjects = [2]
+# subjects = [4]
+
 
 accuracy = []
 
 print("len dataloader:",train_dataloader.dataset.__len__())
-input("Press any key to train...")
+input("Press any key to begin training...")
 # Train Loop
-for subject in (subjects):
 
-        model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model=model_name)
-        user_left_out = subject
+REPEAT = 1
+for i in range(REPEAT):
+    for subject in (subjects):
 
-        if(dataloader == "kw"):
-            train_dataloader, valid_dataloader = generate_data(user_left_out,task,Features, dataloader_params["batch_size"], observation_window)
-        else:
-            train_dataloader, valid_dataloader = get_dataloaders([task],
-                                                            user_left_out,
-                                                            dataloader_params["observation_window"],
-                                                            dataloader_params["prediction_window"],
-                                                            dataloader_params["batch_size"],
-                                                            dataloader_params["one_hot"],
-                                                            class_names = class_names['Suturing'],
-                                                            feature_names = Features,
-                                                            include_image_features=dataloader_params["include_image_features"],
-                                                            cast = dataloader_params["cast"],
-                                                            normalizer = dataloader_params["normalizer"],
-                                                            step=dataloader_params["step"])
+
+            model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
             
+            model.apply(reset_parameters)
+            user_left_out = subject
 
-        val_loss,acc, all_acc = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader)
-        
-        accuracy.append({'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc)})
+            if(dataloader == "kw"):
+                train_dataloader, valid_dataloader = generate_data(user_left_out,task,Features, dataloader_params["batch_size"], observation_window)
+            else:
+                train_dataloader, valid_dataloader = get_dataloaders([task],
+                                                                user_left_out,
+                                                                dataloader_params["observation_window"],
+                                                                dataloader_params["prediction_window"],
+                                                                dataloader_params["batch_size"],
+                                                                dataloader_params["one_hot"],
+                                                                class_names = class_names['Suturing'],
+                                                                feature_names = Features,
+                                                                include_image_features=dataloader_params["include_image_features"],
+                                                                cast = dataloader_params["cast"],
+                                                                normalizer = dataloader_params["normalizer"],
+                                                                step=dataloader_params["step"])
+                
+
+            val_loss,acc, all_acc = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader)
+            
+            accuracy.append({'run': i,'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc)})
 
 
 if(RECORD_RESULTS):
