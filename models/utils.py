@@ -200,6 +200,7 @@ def compute_edit_score(gt, pred):
     max_len = max(len(gt), len(pred))
     return 1.0 - editdistance.eval(gt, pred)/max_len
 
+
 def plot_state_changes(sequences, axs):
 
     num_sequences = len(sequences)

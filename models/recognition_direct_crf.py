@@ -167,12 +167,13 @@ class Trainer:
             emb_dim,
             dropout
         )
+        model = model.to(device)
 
         # loss
         loss_path = os.path.join(model_dir, "loss.csv")
         losses    = pd.read_csv(loss_path).values.tolist() if args['recovery'] and os.path.exists(loss_path) else []
 
-        model.to(device)
+        # optimizer
         if optimizer_type == 'Adam':
             optimizer_cls = torch.optim.Adam
         elif optimizer_type == 'AdamW':
