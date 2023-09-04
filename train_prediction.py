@@ -1,5 +1,6 @@
 from typing import List
 import os
+from pathlib import Path
 from functools import partial
 import torch
 import torch.nn.functional as F
@@ -12,7 +13,7 @@ from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, ki
 from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence
 
 import warnings
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 
 
 # ------------------------------------- Functions ----------------------------------
@@ -60,30 +61,82 @@ def train_model(model, optimizer, criterion, train_dataloader):
 
         epoch_train_losses.append(loss.item())
 
-        # printing statistics
         running_loss += loss.item()
+        # if bi % 50 == 0:
+        #     print(running_loss/50)
+        #     running_loss = 0
     
     train_accuracy = np.mean(np.array(preds) == np.array(gt))
     train_edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
-    return epoch_train_losses, train_accuracy, train_edit_score
+    return np.mean(epoch_train_losses), train_accuracy, train_edit_score
 
 def eval_model(model, criterion, valid_dataloader):
-    pass
 
-def save_artifacts(model, subject_id_to_exclude, train_accuracy, valid_accuracy, train_losses, valid_losses):
+    epoch_valid_losses, valid_accuracy, valid_edit_score = [], None, None
+
+    model.eval()
+    running_loss = 0
+
+    preds, gt = [], []
+
+    with torch.no_grad():
+            
+        for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(valid_dataloader)):
+
+            # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
+            src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
+            future_gesture = future_gesture.transpose(0, 1)
+            tgt = tgt[:, 1:].transpose(0, 1)
+            
+            # get the target mask
+            # tgt_mask = get_tgt_mask(train_dataloader.dataset.prediction_window, device)
+            tgt_mask = None
+
+            # model outputs
+            logits = model(src, tgt, tgt_mask)
+
+            # compute loss
+            if one_hot:
+                gt_output_torch = torch.argmax(future_gesture, dim=-1).reshape(-1)
+            else:
+                gt_output_torch = future_gesture.reshape(-1)
+            loss = criterion(logits.reshape(-1, logits.shape[-1]), gt_output_torch)
+
+            # store predictions and ground truth
+            preds_ = torch.argmax(logits.reshape(-1, logits.shape[-1]), dim=-1).reshape(-1).cpu().numpy().tolist()
+            if one_hot:
+                gt_ = torch.argmax(future_gesture.reshape(-1, future_gesture.shape[-1]), dim=-1).reshape(-1).cpu().numpy().tolsit()
+            else:
+                gt_ = future_gesture.reshape(-1).cpu().numpy().tolist()
+            preds += preds_
+            gt += gt_
+
+            epoch_valid_losses.append(loss.item())
+
+            # printing statistics
+            running_loss += loss.item()
+    
+    valid_accuracy = np.mean(np.array(preds) == np.array(gt))
+    valid_edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
+    print(preds[:100])
+    print(gt[:100])
+    return np.mean(epoch_valid_losses), valid_accuracy, valid_edit_score
+
+def save_artifacts(model, train_accuracy, valid_accuracy, train_records, valid_records):
+    
     # save the losses for the current model and subject
     # save the accuracy for the current model and subject
     # save the model itself
     pass
 
-def plot_artifacts(train_losses, valid_losses, model, subject_id_to_exclude):
+def plot_artifacts(train_losses, valid_losses, model):
     # plot and save train vs. valid losses
     # plot the predictions for a sample trial from the valid set
     pass
 
 ### -------------------------- DATA -----------------------------------------------------
 tasks = ["Suturing"]
-Features = kinematic_feature_names_jigsaws[38:] + state_variables #kinematic features + state variable features
+Features = kinematic_feature_names_jigsaws[38:] #kinematic features + state variable features
 # Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
 
 one_hot = False
@@ -91,10 +144,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 10
 prediction_window = 10
 batch_size = 64
-subject_id_to_exclude = 2
 cast = True
-include_resnet_features = True
-include_colin_features=True
+include_resnet_features = False
+include_colin_features=False
 include_segmentation_features=False
 normalizer = '' # ('standardization', 'min-max', 'power', '')
 step = 3 # 10 Hz
@@ -134,15 +186,16 @@ for subject_id_to_exclude in range(2, 9 + 1):
     #------------------------------------------Build the model and the optimizer---------------------------
 
     # Build the Model
+    model_name = 'transformer'
     from models.transformer import TransformerEncoderDecoderModel
     args = dict(
         num_encoder_layers = 1,
         num_decoder_layers = 1,
-        emb_dim = 128,
+        emb_dim = 64,
         dropout = 0.4,
         optimizer_type = 'Adam',
         weight_decay = 0.001,
-        lr = 1e-3,
+        lr = 1e-5,
         nhead = 4,
         dim_feedforward = 512,
         decoder_embedding_dim = 32
@@ -176,14 +229,20 @@ for subject_id_to_exclude in range(2, 9 + 1):
     experiment_name = 'transformer_kin_context'
     results = {}
     epochs = 20
-    train_losses, valid_losses = [], []
+    train_records, valid_records = [], []
     for epoch in range(epochs):
-        epoch_train_losses, train_accuracy, train_edit_score = train_model(model, optimizer, criterion, train_dataloader)
-        epoch_valid_losses, valid_accuracy, valid_edit_score = eval_model(model, criterion, valid_dataloader)
+        epoch_train_loss, train_accuracy, train_edit_score = train_model(model, optimizer, criterion, train_dataloader)
+        epoch_valid_loss, valid_accuracy, valid_edit_score = eval_model(model, criterion, valid_dataloader)
 
-        train_losses.append(epoch_train_losses)
-        valid_losses.append(epoch_valid_losses)
+        train_records.append((epoch_train_loss, train_accuracy, train_edit_score))
+        valid_records.append((epoch_valid_loss, valid_accuracy, valid_edit_score))
+
+        print(f"Train Results Subject {subject_id_to_exclude} Epoch {epoch}:", train_accuracy, train_edit_score, epoch_train_loss)
+        print(f"Validation Results Subject {subject_id_to_exclude} Epoch {epoch}:", valid_accuracy, valid_edit_score, epoch_valid_loss)
+    # print(train_records)
+    # print('\n\n')
+    # print(valid_records)
     
     # save model, accuracy, edit_score, loss-plots for the current subject
-    save_artifacts(model, train_accuracy, valid_accuracy, train_losses, valid_losses)
-    plot_artifacts(train_losses, valid_losses)
+    # save_artifacts(model, train_accuracy, valid_accuracy, train_records, valid_records)
+    # plot_artifacts(train_records, valid_records, model, valid_dataloader)

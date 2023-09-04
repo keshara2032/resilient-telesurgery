@@ -244,7 +244,7 @@ class LOUO_Dataset(Dataset):
         len_ =  self.Y.shape[0] - self.observation_window_size - self.prediction_window_size
         if not self.sliding_window:
             len_ = math.floor(len_//self.observation_window_size)
-        return len_ + 1
+        return len_
     
     # this should return one sample from the dataset
     def __getitem__(self, idx):

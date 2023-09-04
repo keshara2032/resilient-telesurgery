@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
 from timeit import default_timer as timer
-from models.recognition_direct_transformer import DirectTransformerRecognitionModel
+from models.direct_transformer import DirectTransformerRecognitionModel
 from models.utils import get_tgt_mask, ScheduledOptim
 from utils import get_dataloaders
 from models.utils import get_classification_report
