@@ -21,8 +21,15 @@ def train_model(model, optimizer, train_dataloader):
 def eval_model(model, valid_dataloader):
     pass
 
+def save_artifacts(model, subject_id_to_exclude, train_accuracy, valid_accuracy, train_losses, valid_losses):
+    # save the losses for the current model and subject
+    # save the accuracy for the current model and subject
+    # save the model itself
+    pass
 
-def save_artifacts(model, train_accuracy, valid_accuracy, train_losses, valid_losses):
+def plot_artifacts(train_losses, valid_losses, model, subject_id_to_exclude):
+    # plot and save train vs. valid losses
+    # plot the predictions for a sample trial from the valid set
     pass
 
 ### -------------------------- DATA -----------------------------------------------------
@@ -30,30 +37,50 @@ tasks = ["Suturing"]
 Features = kinematic_feature_names_jigsaws[38:] + state_variables #kinematic features + state variable features
 # Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
 
-one_hot = True
+one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 10
 prediction_window = 10
 batch_size = 64
 subject_id_to_exclude = 2
 cast = True
-include_image_features = False
+include_resnet_features = True
+include_colin_features=True
+include_segmentation_features=False
 normalizer = '' # ('standardization', 'min-max', 'power', '')
 step = 3 # 10 Hz
 
-for subject_id_to_exclude in [2, 3, 4, 5, 6, 7, 8, 9]:
+for subject_id_to_exclude in [5]:
     train_dataloader, valid_dataloader = get_dataloaders(tasks=tasks,
                                                         subject_id_to_exclude=subject_id_to_exclude,
                                                         observation_window=observation_window,
                                                         prediction_window=prediction_window,
                                                         batch_size=batch_size,
                                                         one_hot=one_hot,
-                                                        class_names = class_names['Suturing'],
-                                                        feature_names = Features,
-                                                        include_image_features = include_image_features,
-                                                        cast = cast,
-                                                        normalizer = normalizer,
+                                                        class_names=class_names['Suturing'],
+                                                        feature_names=Features,
+                                                        include_resnet_features=include_resnet_features,
+                                                        include_segmentation_features=include_segmentation_features,
+                                                        include_colin_features=include_colin_features,
+                                                        cast=cast,
+                                                        normalizer=normalizer,
                                                         step=step)
+    print("datasets lengths: ", len(train_dataloader.dataset), len(valid_dataloader.dataset))
+    print("X shape: ", train_dataloader.dataset.X.shape, valid_dataloader.dataset.X.shape)
+    print("Y shape: ", train_dataloader.dataset.Y.shape, valid_dataloader.dataset.Y.shape)
+
+    # loader generator aragement: (src, tgt, future_gesture, future_kinematics)
+    print("Obs Kinematics Shape: ", train_dataloader.dataset[0][0].shape) 
+    print("Obs Target Shape: ", train_dataloader.dataset[0][1].shape)
+    print("Future Target Shape: ", train_dataloader.dataset[0][2].shape)
+    print("Future Kinematics Shape: ", train_dataloader.dataset[0][3].shape)
+    print("Train N Trials: ", train_dataloader.dataset.get_num_trials())
+    print("Train Max Length: ", train_dataloader.dataset.get_max_len())
+    print("Test N Trials: ", valid_dataloader.dataset.get_num_trials())
+    print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
+    print("Features: ", train_dataloader.dataset.get_feature_names())
+    print(train_dataloader.dataset.samples_per_trial)
+    exit()
 
     #------------------------------------------Build the model and the optimizer---------------------------
 
@@ -105,3 +132,4 @@ for subject_id_to_exclude in [2, 3, 4, 5, 6, 7, 8, 9]:
     
     # save model, accuracy, edit_score, loss-plots for the current subject
     save_artifacts(model, train_accuracy, valid_accuracy, train_losses, valid_losses)
+    plot_artifacts(train_losses, valid_losses)

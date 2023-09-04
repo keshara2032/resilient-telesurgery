@@ -1,10 +1,12 @@
 from typing import List, Tuple
+import copy
 import torch
 import os
 from sklearn import preprocessing
 from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
+import scipy.io as sio
 
 import math
 
@@ -44,24 +46,29 @@ def normalize_columns(matrix, normalizer):
 class LOUO_Dataset(Dataset):
     
     def __init__(self,
-                files_path: List[str],
+                kin_files_path: List[str],
                 observation_window_size: int,
                 prediction_window_size: int,
                 step: int = 0,
                 onehot: bool = False,
                 class_names: List[str] = [],
                 feature_names: List[str] = [],
-                include_image_features: bool = False,
+                resnet_files_path: List[str] = [],
+                colin_files_path: List[str] = [],
+                segmentation_files_path: List[str] = [],
                 normalizer: object = None, # (normalization_object of the type['standardization', 'min-max', 'power'])
                 single_window_label: bool = False, # instead of frame-wise labels, return a single label for a window
-                sliding_window: bool = True # slide the window by 1 timestep, or jump the window by `observation_window`
+                sliding_window: bool = True, # slide the window by 1 timestep, or jump the window by `observation_window`
             ):
         
-        self.files_path = files_path
+        self.kin_files_path = kin_files_path
+        self.resnet_files_path = resnet_files_path
+        self.colin_files_path = colin_files_path
+        segmentation_files_path = segmentation_files_path
         self.observation_window_size = observation_window_size
         self.prediction_window_size = prediction_window_size
         self.target_names = class_names
-        self.feature_names_ = feature_names
+        self.feature_names_ = copy.deepcopy(feature_names)
         self.sliding_window = sliding_window
         self.le = preprocessing.LabelEncoder()
         self.onehot = onehot
@@ -72,15 +79,8 @@ class LOUO_Dataset(Dataset):
         self.single_window_label = single_window_label
 
         # reading the data (kinematic features, [image features, context features])
-        (self.X, _X_image, self.Y) = self._load_data() 
+        (self.X, self.Y) = self._load_data() 
         self.feature_names = self.feature_names_
-        if include_image_features:
-            self.X = np.concatenate([self.X, _X_image], axis=-1)
-            self.feature_names = self.feature_names_ + [f"img_{i}" for i in range(_X_image.shape[-1])]
-        
-        if step > 0:
-            self.X, self.Y = self.X[::step], self.Y[::step] # resampling the data (e.g. in going from 30Hz to 10Hz, set step=3)
-            for i, _ in enumerate(self.samples_per_trial): self.samples_per_trial[i] = int(self.samples_per_trial[i]/step)
 
         # feature normalization
         if normalizer:
@@ -139,36 +139,72 @@ class LOUO_Dataset(Dataset):
         Y_future = torch.from_numpy(Y_future).to(target_type).to(self.device)
         P = torch.from_numpy(P).to(torch.float32).to(self.device)
         return X, Y, Y_future, P
-
-        
+    
     def _load_data(self):
         X = []
         X_image = []
         Y = []
         self.samples_per_trial = []
         
-        for kinematics_path, video_path in self.files_path:
+        for i, kinematics_path in enumerate(self.kin_files_path):
             if os.path.isfile(kinematics_path) and kinematics_path.endswith('.csv'):
                 kinematics_data = pd.read_csv(kinematics_path)
 
                 feature_names = kinematics_data.columns.to_list()[:-1] if not self.feature_names_ else self.feature_names_
                 kin_data = kinematics_data.loc[:, feature_names]
                 kin_label = kinematics_data.iloc[:,-1] # last column is always taken to be the target class
-                image_features = np.load(video_path)
 
+                if self.resnet_files_path:
+                    resnet_features_path = self.resnet_files_path[i]
+                    resnet_features = np.load(resnet_features_path)
+
+                if self.colin_files_path:
+                    colin_features_path = self.colin_files_path[i]
+                    colin_features = sio.loadmat(colin_features_path)['A']
+
+                if self.step > 0:
+                    if self.colin_files_path:
+                        assert self.step in [3, 6], 'When using colin features, which is computed in 10 Hz, you must choose step=3 (10Hz) or 6(5Hz)'
+                        if self.step == 6:
+                            colin_features = colin_features[::2]
+                    kin_data = kin_data.loc[pd.RangeIndex(start=0, stop=len(kin_data), step=self.step)].reset_index(drop=True)
+                    kin_label = kin_label.loc[pd.RangeIndex(start=0, stop=len(kin_label), step=self.step)].reset_index(drop=True)
+                    if self.resnet_files_path:
+                        resnet_features = resnet_features[::self.step]
+                
                 # limit by the length of the smaller tensor, image or kin
-                last_index = min(image_features.shape[0], len(kin_data))
+                last_index = len(kin_data)
+                if self.resnet_files_path:
+                    last_index = min(last_index, resnet_features.shape[0])
+                if self.colin_files_path:
+                    last_index = min(last_index, colin_features.shape[0])
                 kin_data = kin_data.iloc[:last_index]
                 kin_label = kin_label.iloc[:last_index]
-                image_features = image_features[:last_index]
+                if self.resnet_files_path:
+                    resnet_features = resnet_features[:last_index]
+                if self.colin_files_path:
+                    colin_features = colin_features[:last_index]
 
                 # drop the frames where the label does not exist
                 drop_ind = kin_label[kin_label == '-'].index
                 kin_data = kin_data.drop(index=drop_ind)
                 kin_label = kin_label.drop(index=drop_ind)
-                image_features = np.delete(image_features, drop_ind.tolist(), axis=0)
-
-                X_image.append(image_features)
+                if self.resnet_files_path:
+                    resnet_features = np.delete(resnet_features, drop_ind.tolist(), axis=0)
+                if self.colin_files_path:
+                    colin_features = np.delete(colin_features, drop_ind.tolist(), axis=0)
+                
+                if self.resnet_files_path:
+                    X_image_subject = resnet_features
+                    if self.colin_files_path:
+                        X_image_subject = np.concatenate([X_image_subject, colin_features], axis=1)
+                else:
+                    if self.colin_files_path:
+                        X_image_subject = colin_features
+                    else:
+                        X_image_subject = None
+                if X_image_subject is not None:
+                    X_image.append(X_image_subject)
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
@@ -190,13 +226,18 @@ class LOUO_Dataset(Dataset):
             Y = [yi.reshape(len(yi), 1) for yi in Y]
             Y = [self.enc.transform(yi) for yi in Y]
         
-        
         # store data inside a single 2D numpy array
-        X_image = np.concatenate(X_image)
         X = np.concatenate(X)
+        if X_image:
+            X_image = np.concatenate(X_image)
+            X = np.concatenate([X, X_image], axis=1)
+        if self.resnet_files_path:
+            self.feature_names_ += [f'resnet_{i}' for i in range(resnet_features.shape[1])]
+        if self.colin_files_path:
+            self.feature_names_ += [f'colin_{i}' for i in range(colin_features.shape[1])]
         Y = np.concatenate(Y)
 
-        return X, X_image, Y, 
+        return X, Y
     
     def __len__(self):
         # this should return the size of the dataset

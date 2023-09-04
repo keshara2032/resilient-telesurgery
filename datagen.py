@@ -14,6 +14,8 @@ class_names = {
 }
 all_class_names = ["G1", 'G2', 'G3', 'G4', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15']
 
+
+## KINEMATICS ##
 kinematic_feature_names = [ "PSML_position_x", "PSML_position_y", "PSML_position_z", \
             "PSML_velocity_x", "PSML_velocity_y", "PSML_velocity_z", \
             "PSML_orientation_x", "PSML_orientation_y", "PSML_orientation_z", "PSML_orientation_w", \
@@ -49,10 +51,28 @@ kinematic_feature_names_jigsaws_no_rot_ps = ["PSML_position_x", "PSML_position_y
                                         "PSMR_position_x", "PSMR_position_y", "PSMR_position_z",
                                         "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z",
                                         "PSMR_gripper_angle"]
+
+## CONTEXT ##
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
 state_variables_repeating_factor = 10
 
-image_features_save_path = './image_features'
+resnet_features_save_path = './resnet_features'
+
+## COLIN FEATURES ##
+colin_features_save_path = './SpatialCNN/'
+colin_train_test_splits = {
+    'Suturing': {
+        2: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_1"),
+        3: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_2"),
+        4: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_3"),
+        5: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_4"),
+        6: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_5"),
+        7: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_6"),
+        8: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_7"),
+        9: os.path.join(colin_features_save_path, "splits", "JIGSAWS", "Suturing", "Split_8"),
+    } 
+}
+
 
 def generate_data(task: str):
     processed_data_path = "./ProcessedDatasets"
@@ -109,9 +129,9 @@ def generate_data(task: str):
             kinematics.to_csv(os.path.join(task_path_target, file[:-3] + 'csv'), index=False)
 
             # collect the video path files
-            video_features_file_path = os.path.join(image_features_save_path, task, file[:-4] + '_Right' + '.npy')
+            video_features_file_path = os.path.join(resnet_features_save_path, task, file[:-4] + '_Right' + '.npy')
             if not os.path.exists(video_features_file_path):
-                video_features_file_path = os.path.join(image_features_save_path, task, file[:-4] + '_Left' + '.npy')
+                video_features_file_path = os.path.join(resnet_features_save_path, task, file[:-4] + '_Left' + '.npy')
             if not os.path.exists(video_features_file_path):
                 raise ValueError(f"The features for video file {os.path.basename(video_features_file_path)} does not exist")
             videos.append(video_features_file_path)
