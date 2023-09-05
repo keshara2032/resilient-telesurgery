@@ -150,7 +150,7 @@ print("Input Features:",input_dim, "Output Classes:",output_dim)
 
 model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
 
-print(model)
+# print(model)
 
 
 ### Subjects 
@@ -158,21 +158,25 @@ subjects = [2,3,4,5,6,7,8,9]
 # subjects = [4]
 
 
-accuracy = []
+results = []
 
 print("len dataloader:",train_dataloader.dataset.__len__())
-input("Press any key to begin training...")
+input("Press any key to begin testing...")
 # Train Loop
 
 REPEAT = 1
 for i in range(REPEAT):
     for subject in (subjects):
 
-
+            model_weights_path = f'./model_weights/S0{subject}_best_model_weights.pth'
+            
             model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
             
             model.apply(reset_parameters)
             user_left_out = subject
+            
+            model.load_state_dict(torch.load(model_weights_path))
+
 
             if(dataloader == "kw"):
                 train_dataloader, valid_dataloader = generate_data(user_left_out,task,Features, dataloader_params["batch_size"], observation_window)
@@ -191,27 +195,30 @@ for i in range(REPEAT):
                                                                 step=dataloader_params["step"])
                 
 
-            val_loss,acc, all_acc, inference_time = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader, subject)
+            # val_loss,acc, all_acc, inference_time = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader, subject)
             
-            rolling_avg = rolling_average(all_acc,3)
-            print('Rolling average:',rolling_avg)
+            # evaluation loop
+            print("****            *****")
+            print(f"Inference on Subject S{subject}")
             
-            accuracy.append({'run': i,'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc), 'rolling_average':rolling_avg[-1], 'avg_inference_time':inference_time})
+            val_loss, accuracy, inference_time, ypreds, gts = eval_loop(model, valid_dataloader, criterion, dataloader)
+
+            print("")
+
+            results.append({'run': i,'subject':subject,  'avg_accuracy':np.max(accuracy), 'avg_inference_time':inference_time})
 
 
 if(RECORD_RESULTS):
-    
-    json_file = 'train_results'
+    json_file = 'inference_results'
     with open(f"./results/{json_file}.json", "w") as outfile:
-        json_object = json.dumps(accuracy, indent=4)
+        json_object = json.dumps(results, indent=4)
         outfile.write(json_object)
         
-
     current_datetime = datetime.datetime.now()
 
     # Format the datetime as a string to be used as a filename
     formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
 
-    csv_name = f'Train_{task}_{model_name}_{formatted_datetime}_num_features{len(Features)}_LOUO_window{dataloader_params["observation_window"]}.csv'
+    csv_name = f'Inference_{task}_{model_name}_{formatted_datetime}_num_features{len(Features)}_LOUO_window{dataloader_params["observation_window"]}.csv'
          
-    json_to_csv(csv_name, json_file)    
+    json_to_csv(csv_name,json_file)    

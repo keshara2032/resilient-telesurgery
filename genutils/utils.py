@@ -4,10 +4,10 @@ import csv
 data = []
 
 
-def json_to_csv(csv_file):
+def json_to_csv(csv_file, json_file):
     
     # Read JSON data from file
-    with open('results/results.json', 'r') as json_file:
+    with open(f'results/{json_file}.json', 'r') as json_file:
         data = json.load(json_file)
 
 

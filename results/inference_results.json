@@ -1,0 +1,50 @@
+[
+    {
+        "run": 0,
+        "subject": 2,
+        "avg_accuracy": 0.7666666666666667,
+        "avg_inference_time": 3.5706764904761905
+    },
+    {
+        "run": 0,
+        "subject": 3,
+        "avg_accuracy": 0.9187500000000001,
+        "avg_inference_time": 0.08879444027777778
+    },
+    {
+        "run": 0,
+        "subject": 4,
+        "avg_accuracy": 0.6692307692307692,
+        "avg_inference_time": 0.1666111282051282
+    },
+    {
+        "run": 0,
+        "subject": 5,
+        "avg_accuracy": 0.8734375000000001,
+        "avg_inference_time": 0.0932608546875
+    },
+    {
+        "run": 0,
+        "subject": 6,
+        "avg_accuracy": 0.8538461538461539,
+        "avg_inference_time": 0.06425840769230769
+    },
+    {
+        "run": 0,
+        "subject": 7,
+        "avg_accuracy": 0.8461538461538463,
+        "avg_inference_time": 0.22425644615384616
+    },
+    {
+        "run": 0,
+        "subject": 8,
+        "avg_accuracy": 0.8222222222222223,
+        "avg_inference_time": 0.10638091666666666
+    },
+    {
+        "run": 0,
+        "subject": 9,
+        "avg_accuracy": 0.820289855072464,
+        "avg_inference_time": 0.06527142463768115
+    }
+]
