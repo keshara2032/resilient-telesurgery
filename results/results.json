@@ -2,73 +2,73 @@
     {
         "run": 0,
         "subject": 2,
-        "last_accuracy": 0.6809523809523808,
-        "avg_accuracy": 0.6750793650793651,
-        "highest_accuracy": 0.7238095238095239,
-        "rolling_average": 0.6873015873015872,
-        "avg_inference_time": 0.16571720952380953
+        "last_accuracy": 0.7190476190476192,
+        "avg_accuracy": 0.7280952380952381,
+        "highest_accuracy": 0.7666666666666667,
+        "rolling_average": 0.7238095238095239,
+        "avg_inference_time": 0.11981584285714286
     },
     {
         "run": 0,
         "subject": 3,
-        "last_accuracy": 0.8430555555555556,
-        "avg_accuracy": 0.846712962962963,
-        "highest_accuracy": 0.90625,
-        "rolling_average": 0.8449074074074074,
-        "avg_inference_time": 0.16805088125
+        "last_accuracy": 0.8687500000000001,
+        "avg_accuracy": 0.8731481481481481,
+        "highest_accuracy": 0.9187500000000001,
+        "rolling_average": 0.8770833333333335,
+        "avg_inference_time": 0.15552481875000002
     },
     {
         "run": 0,
         "subject": 4,
-        "last_accuracy": 0.5512820512820512,
-        "avg_accuracy": 0.5336752136752136,
-        "highest_accuracy": 0.6051282051282052,
-        "rolling_average": 0.5529914529914529,
-        "avg_inference_time": 0.0945699
+        "last_accuracy": 0.6692307692307692,
+        "avg_accuracy": 0.5907692307692308,
+        "highest_accuracy": 0.6692307692307692,
+        "rolling_average": 0.6615384615384615,
+        "avg_inference_time": 0.11394076666666667
     },
     {
         "run": 0,
         "subject": 5,
-        "last_accuracy": 0.7140624999999999,
-        "avg_accuracy": 0.7262500000000001,
-        "highest_accuracy": 0.8406250000000002,
-        "rolling_average": 0.7869791666666667,
-        "avg_inference_time": 0.084739846875
+        "last_accuracy": 0.85,
+        "avg_accuracy": 0.8304166666666669,
+        "highest_accuracy": 0.8734375000000001,
+        "rolling_average": 0.8151041666666666,
+        "avg_inference_time": 0.15572941406250002
     },
     {
         "run": 0,
         "subject": 6,
-        "last_accuracy": 0.7615384615384617,
-        "avg_accuracy": 0.7856410256410258,
-        "highest_accuracy": 0.8384615384615386,
-        "rolling_average": 0.771794871794872,
-        "avg_inference_time": 0.16624919230769233
+        "last_accuracy": 0.8307692307692308,
+        "avg_accuracy": 0.7938461538461539,
+        "highest_accuracy": 0.8538461538461539,
+        "rolling_average": 0.8282051282051283,
+        "avg_inference_time": 0.12431714615384615
     },
     {
         "run": 0,
         "subject": 7,
-        "last_accuracy": 0.7923076923076924,
-        "avg_accuracy": 0.697051282051282,
-        "highest_accuracy": 0.8230769230769232,
-        "rolling_average": 0.7807692307692307,
-        "avg_inference_time": 0.10907458076923077
+        "last_accuracy": 0.8153846153846155,
+        "avg_accuracy": 0.8143589743589744,
+        "highest_accuracy": 0.8461538461538463,
+        "rolling_average": 0.821794871794872,
+        "avg_inference_time": 0.16826196538461538
     },
     {
         "run": 0,
         "subject": 8,
-        "last_accuracy": 0.7555555555555558,
-        "avg_accuracy": 0.7687037037037038,
-        "highest_accuracy": 0.7944444444444446,
-        "rolling_average": 0.7685185185185187,
-        "avg_inference_time": 0.1628972388888889
+        "last_accuracy": 0.8055555555555557,
+        "avg_accuracy": 0.786666666666667,
+        "highest_accuracy": 0.8222222222222223,
+        "rolling_average": 0.8111111111111112,
+        "avg_inference_time": 0.11542862222222222
     },
     {
         "run": 0,
         "subject": 9,
-        "last_accuracy": 0.7550724637681161,
-        "avg_accuracy": 0.7356521739130435,
-        "highest_accuracy": 0.7768115942028987,
-        "rolling_average": 0.7570048309178744,
-        "avg_inference_time": 0.2247570623188406
+        "last_accuracy": 0.7811594202898553,
+        "avg_accuracy": 0.7600966183574881,
+        "highest_accuracy": 0.820289855072464,
+        "rolling_average": 0.7908212560386474,
+        "avg_inference_time": 0.12319102318840583
     }
 ]

@@ -68,6 +68,6 @@ def get_dataloaders(tasks: List[str],
 
     target_type = torch.float32 if one_hot else torch.long
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast))
-    valid_dataloader = DataLoader(valid_dataset, shuffle=True, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast)) 
+    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast)) 
 
     return train_dataloader, valid_dataloader  

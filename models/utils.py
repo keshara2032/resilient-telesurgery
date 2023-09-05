@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import pandas as pd
 import time
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -119,8 +120,8 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
 
         # myaccuracy = calc_accuracy(nypreds, ngts)
         # print("My Accuracy:",myaccuracy)
-        # ypreds = np.concatenate(ypreds)
-        # gts = np.concatenate(gts)
+        ypreds = np.concatenate(ypreds)
+        gts = np.concatenate(gts)
 
         # # get_classification_report(ypreds,gts,test_dataloader.dataset.get_target_names())
 
@@ -135,14 +136,20 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
         inference_time = np.mean(inference_times)
         print("Accuracy:", accuracy, 'Inference Time per window:',inference_time)
 
-        return np.mean(losses), accuracy, inference_time
+        return np.mean(losses), accuracy, inference_time, ypreds, gts
 
 # train loop, calls evaluation every epoch
-def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader):
+def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader, subject):
 
 
     accuracy = 0
     total_accuracy = []
+    
+    ypreds, gts = [],[]
+    highest_acc = 0
+    
+    file_path = f'./model_weights/S0{subject}_best_model_weights.pth'
+    
     # training loop
     for epoch in range(epochs):
         model.train()
@@ -181,11 +188,30 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             f"Training Epoch {epoch+1}, Training Loss: {running_loss / len(train_dataloader):.6f}")
 
         # evaluation loop
-        val_loss, accuracy, inference_time = eval_loop(model, test_dataloader, criterion, dataloader)
+        val_loss, accuracy, inference_time, ypreds, gts = eval_loop(model, test_dataloader, criterion, dataloader)
         print(f"Valdiation Epoch {epoch+1}, Validation Loss: {val_loss:.6f}")
 
-        total_accuracy.append(accuracy)
+        if(accuracy > highest_acc): # save only if the accuracy is higher than before
+            highest_acc = accuracy
+            # Save the model weights to the file
+            torch.save(model.state_dict(), file_path)
 
+
+        total_accuracy.append(accuracy)
+    
+    results = {'subject':subject, 'prediction':ypreds, 'groundtruth':gts}
+    df = pd.DataFrame(results)
+
+    df_outpath = './results/model_outputs/'
+        # Create the directory if it doesn't exist
+    if not os.path.exists(df_outpath):
+        os.makedirs(df_outpath)
+        print(f"Directory '{df_outpath}' created.")
+    else:
+        print(f"Directory '{df_outpath}' already exists.")
+
+    df.to_csv(f'{df_outpath}S0{subject}_output.csv')
+    
     return val_loss, accuracy, total_accuracy, inference_time
 
 

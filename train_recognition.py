@@ -191,7 +191,7 @@ for i in range(REPEAT):
                                                                 step=dataloader_params["step"])
                 
 
-            val_loss,acc, all_acc, inference_time = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader)
+            val_loss,acc, all_acc, inference_time = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader, subject)
             
             rolling_avg = rolling_average(all_acc,3)
             print('Rolling average:',rolling_avg)

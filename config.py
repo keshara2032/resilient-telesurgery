@@ -75,6 +75,7 @@ dataloader_params = {
     "include_image_features": False,
     "normalizer": '',  # ('standardization', 'min-max', 'power', '')
     "step": 1,  # 1 - 30 Hz
-    "context": 8  # 0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context, 6-colin_features, 7- colin+context, 8-colin+kin, 9-colin+kin+context
+    "context": 9  # 0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context, 6-colin_features, 7- colin+context, 8-colin+kin, 9-colin+kin+context
+    # hamid -  do not need (1,3,5,7)
     
 }
