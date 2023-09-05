@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 
+from .unet import *
 
 class GlobalMaxPooling1D(nn.Module):
 
@@ -122,12 +123,28 @@ class TransformerModel(nn.Module):
         self.decoder = CNN_Decoder(**decoder_params)
         
         self.max_pool = GlobalMaxPooling1D()
-        self.fc = nn.Linear(input_dim, d_model)
         # self.out = nn.Linear(int(d_model/2), output_dim)
         self.out = nn.Linear(d_model, output_dim) # vanilla + gru
+        num_stages = 4
+        num_layers = 10
+        num_f_maps = 64
+        features_dim = 2048
+        
+        self.fc = nn.Linear(input_dim, features_dim)
+        
+        # self.msrnn = MultiStageModel(num_stages, num_layers, num_f_maps, features_dim, output_dim)
+
         
     # tcn + transformer
     def forward(self, x):
+        
+        
+        # x = self.fc(x)
+        # x = x.permute(0,2,1)
+        # x = self.msrnn(x,x)
+        # x = self.max_pool(x) # gets rid of seq_len
+        # print(x.shape)
+        # input()
         
         
         x = self.encoder(x)

@@ -3,6 +3,8 @@
 dataset/
 new_dataset/
 
+Datasets/*
+
 ProcessedDatasets/*
 results/*.csv
 

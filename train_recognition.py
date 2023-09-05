@@ -17,7 +17,7 @@ from functools import partial
 import torch.nn.functional as F
 from timeit import default_timer as timer
 from datautils.utils import get_dataloaders
-from datautils.datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_patient_position, class_names, all_class_names, state_variables
+from datautils.datagen import kinematic_feature_names,colin_features, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_patient_position, class_names, all_class_names, state_variables
 from tqdm import tqdm
 from collections import OrderedDict
 from config import *
@@ -61,9 +61,9 @@ dataloader = args.dataloader
 
 
 # tasks and features to be included
-task = ["Suturing",""]
+task = "Suturing"
 
-context = transformer_params["context"]
+context = dataloader_params["context"]
 
 
 if(context == 0): #kin only
@@ -75,8 +75,8 @@ elif(context == 1): #context only
     Features = state_variables
 
 elif(context == 2): # context + kin
-    # Features = kinematic_feature_names_jigsaws[38:] + state_variables #all patient side kinematic features + state variable features
-    Features = kinematic_feature_names_jigsaws_patient_position + state_variables #kinematic features + state variable features
+    Features = kinematic_feature_names_jigsaws[38:] + state_variables #all patient side kinematic features + state variable features
+    # Features = kinematic_feature_names_jigsaws_patient_position + state_variables #kinematic features + state variable features
 
 elif(context == 3): # img features only
     Features = img_features 
@@ -87,6 +87,19 @@ elif(context == 4): # img features + kin
 elif(context == 5): # img features + kin + context
     Features = img_features + kinematic_feature_names_jigsaws_patient_position + state_variables
 
+
+elif(context == 6): # colin_features
+    Features = colin_features
+
+elif(context == 7): # colin+context
+    Features = colin_features + state_variables
+    
+elif(context == 8): # colin + kinematic 14 
+    Features = colin_features + kinematic_feature_names_jigsaws_patient_position
+   
+elif(context == 9): # colin + kinematic 14  + context
+    Features = colin_features + kinematic_feature_names_jigsaws_patient_position + state_variables
+   
 epochs = learning_params["epochs"]
 observation_window = dataloader_params["observation_window"],
 
@@ -132,8 +145,8 @@ print("Input Features:",input_dim, "Output Classes:",output_dim)
 
 
 ### DEFINE MODEL HERE ###
-# model = 'tcn' 
-# model = 'transformer'
+# model_name = 'tcn' 
+# model_name = 'transformer'
 
 model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
 
@@ -178,9 +191,12 @@ for i in range(REPEAT):
                                                                 step=dataloader_params["step"])
                 
 
-            val_loss,acc, all_acc = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader)
+            val_loss,acc, all_acc, inference_time = traintest_loop(train_dataloader,valid_dataloader,model,optimizer,scheduler,criterion, epochs, dataloader)
             
-            accuracy.append({'run': i,'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc)})
+            rolling_avg = rolling_average(all_acc,3)
+            print('Rolling average:',rolling_avg)
+            
+            accuracy.append({'run': i,'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc), 'rolling_average':rolling_avg[-1], 'avg_inference_time':inference_time})
 
 
 if(RECORD_RESULTS):

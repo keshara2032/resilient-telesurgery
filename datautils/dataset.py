@@ -149,21 +149,21 @@ class LOUO_Dataset(Dataset):
                 feature_names = kinematics_data.columns.to_list()[:-1] if not self.feature_names_ else self.feature_names_
                 kin_data = kinematics_data.loc[:, feature_names]
                 kin_label = kinematics_data.iloc[:,-1] # last column is always taken to be the target class
-                image_features = np.load(video_path)
+                # image_features = np.load(video_path)
 
                 # limit by the length of the smaller tensor, image or kin
-                last_index = min(image_features.shape[0], len(kin_data))
+                last_index =  len(kin_data)
                 kin_data = kin_data.iloc[:last_index]
                 kin_label = kin_label.iloc[:last_index]
-                image_features = image_features[:last_index]
+                # image_features = image_features[:last_index]
 
                 # drop the frames where the label does not exist
                 drop_ind = kin_label[kin_label == '-'].index
                 kin_data = kin_data.drop(index=drop_ind)
                 kin_label = kin_label.drop(index=drop_ind)
-                image_features = np.delete(image_features, drop_ind.tolist(), axis=0)
+                # image_features = np.delete(image_features, drop_ind.tolist(), axis=0)
 
-                X_image.append(image_features)
+                # X_image.append(image_features)
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))
@@ -190,9 +190,10 @@ class LOUO_Dataset(Dataset):
         
         
         # store data inside a single 2D numpy array
-        X_image = np.concatenate(X_image)
+        # X_image = np.concatenate(X_image)
         X = np.concatenate(X)
         Y = np.concatenate(Y)
+        X_image = []
 
         return X, X_image, Y, 
     

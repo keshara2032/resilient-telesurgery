@@ -38,41 +38,43 @@ tcn_model_params = {
 
 
 transformer_params = {
-    "d_model": 64,
-    "nhead": 32,
-    "num_layers": 4,
-    "hidden_dim": 64,
+    "d_model": 128,
+    "nhead": 4,
+    "num_layers": 2,
+    "hidden_dim": 128,
     "layer_dim": 4,
     "encoder_params": {
         "in_channels": 14,
-        "kernel_size": 29,
-        "out_channels": 64,
-                       },
+        "kernel_size": 59,
+        "out_channels": 128,
+    },
     "decoder_params": {
-        "in_channels": 64,
-        "kernel_size": 29,
+        "in_channels": 128,
+        "kernel_size": 59,
         "out_channels": 64
     },
-    "context":2 #0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context
 }
 
 learning_params = {
-    "lr": 8.906324028628413e-5,
-    # "lr": 1e-6,
-    "epochs": 10,
-    "weight_decay": 1e-5,
+    # "lr": 8.906324028628413e-5,
+    "lr": 5e-05,
+    "epochs": 30,
+    "weight_decay": 5e-5,
     "patience": 3
 }
 
 dataloader_params = {
+    
     "batch_size": 10,
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "observation_window": 32,
+    "observation_window": 30,
     "prediction_window": 10,
     "user_left_out": 2,
     "cast": True,
     "include_image_features": False,
     "normalizer": '',  # ('standardization', 'min-max', 'power', '')
-    "step": 2,  # 1 - 30 Hz
+    "step": 1,  # 1 - 30 Hz
+    "context": 8  # 0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context, 6-colin_features, 7- colin+context, 8-colin+kin, 9-colin+kin+context
+    
 }

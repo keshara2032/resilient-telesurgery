@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
+import time
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -16,7 +17,7 @@ def reset_parameters(module):
 
 def initiate_model(input_dim, output_dim, transformer_params, learning_params, tcn_model_params, model_name):
 
-    d_model, nhead, num_layers, hidden_dim, layer_dim, encoder_params, decoder_params, context = transformer_params.values()
+    d_model, nhead, num_layers, hidden_dim, layer_dim, encoder_params, decoder_params = transformer_params.values()
 
     lr, epochs, weight_decay, patience = learning_params.values()
 
@@ -65,6 +66,7 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
         accuracy = 0
         n_batches = len(test_dataloader)
         
+        inference_times = []
         nypreds,ngts = [],[]
         
         for src, tgt, future_gesture, future_kinematics in test_dataloader:
@@ -80,8 +82,12 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
             # y = tgt
 
 
+            start_time = time.time_ns()
             y_pred = model(src)  # [64,10]
-
+            end_time = time.time_ns()
+            inference_time = (end_time-start_time)/1e6
+            inference_time = inference_time/src.shape[0] #divide by batch size to get time for single window
+            inference_times.append(inference_time)
             # threshold = 0.6
             # by_pred = (y_pred > threshold).int()
             # nypreds.append(by_pred)
@@ -126,9 +132,10 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
         # # Calculate accuracy
         # accuracy = matches / len(ypreds)
         accuracy = accuracy/n_batches
-        print("Accuracy:", accuracy)
+        inference_time = np.mean(inference_times)
+        print("Accuracy:", accuracy, 'Inference Time per window:',inference_time)
 
-        return np.mean(losses), accuracy
+        return np.mean(losses), accuracy, inference_time
 
 # train loop, calls evaluation every epoch
 def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader):
@@ -174,12 +181,12 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             f"Training Epoch {epoch+1}, Training Loss: {running_loss / len(train_dataloader):.6f}")
 
         # evaluation loop
-        val_loss, accuracy = eval_loop(model, test_dataloader, criterion, dataloader)
+        val_loss, accuracy, inference_time = eval_loop(model, test_dataloader, criterion, dataloader)
         print(f"Valdiation Epoch {epoch+1}, Validation Loss: {val_loss:.6f}")
 
         total_accuracy.append(accuracy)
 
-    return val_loss, accuracy, total_accuracy
+    return val_loss, accuracy, total_accuracy, inference_time
 
 
 
@@ -199,3 +206,22 @@ def calc_accuracy(pred, gt):
     print("Accuracy:", accuracy)
     
     return accuracy
+
+
+def rolling_average(arr, window_size):
+    """
+    Calculate a rolling average for an array of numbers.
+
+    Args:
+        arr (list): The input array of numbers.
+        window_size (int): The size of the rolling window.
+
+    Returns:
+        list: The rolling average as a list.
+    """
+    rolling_avg = []
+    for i in range(len(arr) - window_size + 1):
+        window = arr[i:i + window_size]
+        avg = sum(window) / window_size
+        rolling_avg.append(avg)
+    return rolling_avg
