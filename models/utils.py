@@ -139,7 +139,7 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
         return np.mean(losses), accuracy, inference_time, ypreds, gts
 
 # train loop, calls evaluation every epoch
-def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader, subject):
+def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader, subject, modality):
 
 
     accuracy = 0
@@ -148,7 +148,7 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
     ypreds, gts = [],[]
     highest_acc = 0
     
-    file_path = f'./model_weights/S0{subject}_best_model_weights.pth'
+    file_path = f'./model_weights/Modality_M{modality}_S0{subject}_best_model_weights.pth'
     
     # training loop
     for epoch in range(epochs):

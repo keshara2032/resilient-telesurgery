@@ -55,7 +55,7 @@ colin_features = ["colin_0", "colin_1", "colin_2", "colin_3", "colin_4", "colin_
 state_variables = ['left_holding', 'left_contact',
                    'right_holding', 'right_contact', 'needle_state']
 
-img_features = ["img_" + str(i) for i in range(2048)]
+img_features = ["resnet_" + str(i) for i in range(2048)]
 
 state_variables_repeating_factor = 10
 

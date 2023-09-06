@@ -168,7 +168,7 @@ REPEAT = 1
 for i in range(REPEAT):
     for subject in (subjects):
 
-            model_weights_path = f'./model_weights/S0{subject}_best_model_weights.pth'
+            model_weights_path = f'./model_weights/Modality_M{context}_S0{subject}_best_model_weights.pth'
             
             model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
             

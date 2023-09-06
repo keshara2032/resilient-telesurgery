@@ -1,0 +1,74 @@
+[
+    {
+        "run": 0,
+        "subject": 2,
+        "last_accuracy": 0.7380952380952382,
+        "avg_accuracy": 0.7296825396825397,
+        "highest_accuracy": 0.7619047619047619,
+        "rolling_average": 0.7412698412698413,
+        "avg_inference_time": 0.08578558095238097
+    },
+    {
+        "run": 0,
+        "subject": 3,
+        "last_accuracy": 0.9,
+        "avg_accuracy": 0.8723611111111111,
+        "highest_accuracy": 0.9180555555555556,
+        "rolling_average": 0.8958333333333335,
+        "avg_inference_time": 0.15543386874999998
+    },
+    {
+        "run": 0,
+        "subject": 4,
+        "last_accuracy": 0.6538461538461539,
+        "avg_accuracy": 0.59008547008547,
+        "highest_accuracy": 0.6692307692307692,
+        "rolling_average": 0.6487179487179486,
+        "avg_inference_time": 0.17452432051282052
+    },
+    {
+        "run": 0,
+        "subject": 5,
+        "last_accuracy": 0.85,
+        "avg_accuracy": 0.8304166666666667,
+        "highest_accuracy": 0.86875,
+        "rolling_average": 0.85,
+        "avg_inference_time": 0.156850225
+    },
+    {
+        "run": 0,
+        "subject": 6,
+        "last_accuracy": 0.8,
+        "avg_accuracy": 0.8041025641025641,
+        "highest_accuracy": 0.8461538461538461,
+        "rolling_average": 0.8153846153846155,
+        "avg_inference_time": 0.1508450692307692
+    },
+    {
+        "run": 0,
+        "subject": 7,
+        "last_accuracy": 0.8076923076923079,
+        "avg_accuracy": 0.8175641025641026,
+        "highest_accuracy": 0.8653846153846154,
+        "rolling_average": 0.8115384615384617,
+        "avg_inference_time": 0.20321597307692307
+    },
+    {
+        "run": 0,
+        "subject": 8,
+        "last_accuracy": 0.8333333333333335,
+        "avg_accuracy": 0.7979629629629631,
+        "highest_accuracy": 0.8333333333333335,
+        "rolling_average": 0.8203703703703705,
+        "avg_inference_time": 0.07838315000000001
+    },
+    {
+        "run": 0,
+        "subject": 9,
+        "last_accuracy": 0.7927536231884058,
+        "avg_accuracy": 0.7578260869565216,
+        "highest_accuracy": 0.8159420289855072,
+        "rolling_average": 0.7695652173913045,
+        "avg_inference_time": 0.1702935144927536
+    }
+]
