@@ -1,5 +1,5 @@
 import math
-
+import itertools
 import torch
 from torch import Tensor
 from torch.nn import Transformer
@@ -175,19 +175,7 @@ def get_classification_report(pred, gt, target_names):
     # get the classification report
     labels=np.arange(0, len(target_names) ,1)
     report = classification_report(gt, pred, target_names=target_names, labels=labels, output_dict=True)
-
-    # plot computation matrix
-    conf_matrix = confusion_matrix(gt, pred)
-    # plot_confusion_matrix(conf_matrix, target_names)
-
-    pd.DataFrame(report).transpose().to_csv("metrics.csv")
-    accuracy = np.mean(pred == gt)
-    edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(pred))
-    print('Accuracy: ', accuracy)
-    print('Edit Score: ', edit_score)
-
-
-    return accuracy, edit_score, pd.DataFrame(report).transpose()
+    return pd.DataFrame(report).transpose()
 
 def merge_gesture_sequence(seq):
     import itertools
@@ -232,3 +220,42 @@ def plot_state_changes(sequences, axs):
 
 def get_tgt_mask(window_size, device):
     return Transformer.generate_square_subsequent_mask(window_size, device)
+
+def get_labels(frame_wise_labels):
+    labels = []
+
+    tmp = [0]
+    count = 0
+    for key, group in itertools.groupby(frame_wise_labels):
+        action_len = len(list(group))
+        tmp.append(tmp[count] + action_len)
+        count += 1
+        labels.append(key)
+    starts = tmp[:-1]
+    ends = tmp[1:]
+
+    return labels, starts, ends
+
+def f_score(predicted, ground_truth, overlap):
+    p_label, p_start, p_end = get_labels(predicted)
+    y_label, y_start, y_end = get_labels(ground_truth)
+
+    tp = 0
+    fp = 0
+
+    hits = np.zeros(len(y_label))
+
+    for j in range(len(p_label)):
+        intersection = np.minimum(p_end[j], y_end) - np.maximum(p_start[j], y_start)
+        union = np.maximum(p_end[j], y_end) - np.minimum(p_start[j], y_start)
+        IoU = (1.0 * intersection / union) * ([p_label[j] == y_label[x] for x in range(len(y_label))])
+        # Get the best scoring segment
+        idx = np.array(IoU).argmax()
+
+        if IoU[idx] >= overlap and not hits[idx]:
+            tp += 1
+            hits[idx] = 1
+        else:
+            fp += 1
+    fn = len(y_label) - sum(hits)
+    return float(tp), float(fp), float(fn)

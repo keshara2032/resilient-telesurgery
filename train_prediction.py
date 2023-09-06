@@ -10,13 +10,49 @@ from tqdm import tqdm
 from timeit import default_timer as timer
 from utils import get_dataloaders
 from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_no_rot_ps, class_names, all_class_names, state_variables
-from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence
+from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence, f_score, get_classification_report
 
 import warnings
 # warnings.filterwarnings('ignore')
 
 
 # ------------------------------------- Functions ----------------------------------
+def compute_metrics(preds, gt):
+
+    metrics = dict()
+
+    # frame wise accuracy
+    metrics['accuracy'] = np.mean(np.array(preds) == np.array(gt))
+
+    # edit score
+    metrics['edit_score'] = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
+
+    # F1 @ X
+    overlap = [.1, .25, .5] # F1 @ [10, 25, 50]
+    tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
+    for s in range(len(overlap)):
+        tp1, fp1, fn1 = f_score(preds, gt, overlap[s])
+        tp[s] += tp1
+        fp[s] += fp1
+        fn[s] += fn1
+    for s in range(len(overlap)):
+        precision = tp[s] / float(tp[s] + fp[s])
+        recall = tp[s] / float(tp[s] + fn[s])
+
+        f1_ = 2.0 * (precision * recall) / (precision + recall)
+        f1_ = np.nan_to_num(f1) * 100
+        metrics[f'F1@{int(overlap[s]*10)}'] = f1_
+
+    # confusion matrix
+
+    # classification report
+    report = get_classification_report(preds, gt, valid_dataloader.dataset.get_target_names())
+    metrics['report'] = report
+
+    return metrics
+
+
+
 def train_model(model, optimizer, criterion, train_dataloader):
 
     epoch_train_losses, train_accuracy, train_edit_score = [], None, None
@@ -65,10 +101,8 @@ def train_model(model, optimizer, criterion, train_dataloader):
         # if bi % 50 == 0:
         #     print(running_loss/50)
         #     running_loss = 0
-    
-    train_accuracy = np.mean(np.array(preds) == np.array(gt))
-    train_edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
-    return np.mean(epoch_train_losses), train_accuracy, train_edit_score
+    train_metrics = compute_metrics(preds, gt)
+    return np.mean(epoch_train_losses), train_metrics
 
 def eval_model(model, criterion, valid_dataloader):
 
@@ -77,7 +111,7 @@ def eval_model(model, criterion, valid_dataloader):
     model.eval()
     running_loss = 0
 
-    preds, gt = [], []
+    preds, probs, gt = [], []
 
     with torch.no_grad():
             
@@ -110,26 +144,23 @@ def eval_model(model, criterion, valid_dataloader):
                 gt_ = future_gesture.reshape(-1).cpu().numpy().tolist()
             preds += preds_
             gt += gt_
+            probs.append(logits.reshape(-1, logits.shape[-1]).cpu().numpy())
 
             epoch_valid_losses.append(loss.item())
 
             # printing statistics
             running_loss += loss.item()
-    
-    valid_accuracy = np.mean(np.array(preds) == np.array(gt))
-    valid_edit_score = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
+    probs = np.concatenate(probs, axis=0)
+    valid_metrics = compute_metrics(preds, gt)
     print(preds[:100])
     print(gt[:100])
-    return np.mean(epoch_valid_losses), valid_accuracy, valid_edit_score
+    return np.mean(epoch_valid_losses), valid_metrics
 
-def save_artifacts(model, train_accuracy, valid_accuracy, train_records, valid_records):
-    
+def save_artifacts(model, train_records, valid_records, valid_dataloader):
+    Path(f'/results/{experiment_name}').mkdir(parents=True, exist_ok=True)
     # save the losses for the current model and subject
     # save the accuracy for the current model and subject
     # save the model itself
-    pass
-
-def plot_artifacts(train_losses, valid_losses, model):
     # plot and save train vs. valid losses
     # plot the predictions for a sample trial from the valid set
     pass
@@ -231,18 +262,17 @@ for subject_id_to_exclude in range(2, 9 + 1):
     epochs = 20
     train_records, valid_records = [], []
     for epoch in range(epochs):
-        epoch_train_loss, train_accuracy, train_edit_score = train_model(model, optimizer, criterion, train_dataloader)
-        epoch_valid_loss, valid_accuracy, valid_edit_score = eval_model(model, criterion, valid_dataloader)
+        epoch_train_loss, train_metrics = train_model(model, optimizer, criterion, train_dataloader)
+        epoch_valid_loss, valid_metrics = eval_model(model, criterion, valid_dataloader)
 
-        train_records.append((epoch_train_loss, train_accuracy, train_edit_score))
-        valid_records.append((epoch_valid_loss, valid_accuracy, valid_edit_score))
+        train_records.append((epoch_train_loss, train_metrics))
+        valid_records.append((epoch_valid_loss, valid_metrics))
 
-        print(f"Train Results Subject {subject_id_to_exclude} Epoch {epoch}:", train_accuracy, train_edit_score, epoch_train_loss)
-        print(f"Validation Results Subject {subject_id_to_exclude} Epoch {epoch}:", valid_accuracy, valid_edit_score, epoch_valid_loss)
+        print(f"Train Results Subject {subject_id_to_exclude} Epoch {epoch}:", train_metrics['accuracy'], train_metrics['edit_score'], epoch_train_loss)
+        print(f"Validation Results Subject {subject_id_to_exclude} Epoch {epoch}:", valid_metrics['accuracy'], valid_metrics['edit_score'], epoch_valid_loss)
     # print(train_records)
     # print('\n\n')
     # print(valid_records)
     
     # save model, accuracy, edit_score, loss-plots for the current subject
-    # save_artifacts(model, train_accuracy, valid_accuracy, train_records, valid_records)
-    # plot_artifacts(train_records, valid_records, model, valid_dataloader)
+    # save_artifacts(model, train_records, valid_records, valid_dataloader)
