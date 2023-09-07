@@ -84,7 +84,7 @@ class ScheduledOptim():
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
 
-def plot_bars(gt, pred=None, states=None):
+def plot_bars(gt, pred=None, states=None, save_path=None):
 
     def plot_sequence_as_horizontal_bar(sequence, title, ax):
         # if not sequence:
@@ -105,11 +105,11 @@ def plot_bars(gt, pred=None, states=None):
 
         # Create the horizontal bar plot
         current_position = 0
-
+        colors = "#9e0142 #d53e4f #f46d43 #fdae61 #fee08b #e6f598 #abdda4 #66c2a5 #3288bd #5e4fa2".split()
         for i in range(len(unique_elements)):
             element = unique_elements[i]
             span_length = span_lengths[i]
-            ax.barh(0, span_length, left=current_position, height=1, color=f'C{element}')
+            ax.barh(0, span_length, left=current_position, height=1, color=colors[element])
             current_position += span_length
 
         ax.set_yticks([])
@@ -143,7 +143,7 @@ def plot_bars(gt, pred=None, states=None):
         nrows += 2 # plot the prediciton and difference bars
     if states is not None:
         nrows += 5 # plot the state changes
-    fig, axes = plt.subplots(nrows=nrows, sharex=True, ncols=1, figsize=(10, 12))
+    fig, axes = plt.subplots(nrows=nrows, sharex=True, ncols=1, figsize=(8, 1))
 
     plot_sequence_as_horizontal_bar(true_sequence, "Ground Truth", axes[0])
     if pred is not None:
@@ -156,7 +156,9 @@ def plot_bars(gt, pred=None, states=None):
             plot_state_changes(states, axes[1:])
 
     plt.tight_layout()
-    plt.show()
+    if save_path:
+        plt.savefig(save_path)
+    # plt.show()
 
 def plot_confusion_matrix(conf_matrix, labels):
     row_normalized_conf_matrix = conf_matrix / conf_matrix.sum(axis=1, keepdims=True)

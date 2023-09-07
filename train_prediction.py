@@ -1,15 +1,18 @@
 from typing import List
 import os
 from pathlib import Path
+import json
 from functools import partial
 import torch
 import torch.nn.functional as F
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from tqdm import tqdm
 from timeit import default_timer as timer
 from utils import get_dataloaders
-from datagen import kinematic_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_no_rot_ps, class_names, all_class_names, state_variables
+from datagen import kinematic_feature_names, trajectory_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_no_rot_ps, class_names, all_class_names, state_variables
 from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence, f_score, get_classification_report
 
 import warnings
@@ -17,7 +20,7 @@ import warnings
 
 
 # ------------------------------------- Functions ----------------------------------
-def compute_metrics(preds, gt):
+def compute_metrics(preds, gt, regression_preds, regressoin_gt, is_train=False):
 
     metrics = dict()
 
@@ -27,54 +30,60 @@ def compute_metrics(preds, gt):
     # edit score
     metrics['edit_score'] = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
 
-    # F1 @ X
-    overlap = [.1, .25, .5] # F1 @ [10, 25, 50]
-    tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
-    for s in range(len(overlap)):
-        tp1, fp1, fn1 = f_score(preds, gt, overlap[s])
-        tp[s] += tp1
-        fp[s] += fp1
-        fn[s] += fn1
-    for s in range(len(overlap)):
-        precision = tp[s] / float(tp[s] + fp[s])
-        recall = tp[s] / float(tp[s] + fn[s])
+    metrics['MSE'] = {k: v for k, v in zip(trajectory_feature_names, mean_squared_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
+    metrics['MAPE'] = {k: v for k, v in zip(trajectory_feature_names, mean_absolute_percentage_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
 
-        f1_ = 2.0 * (precision * recall) / (precision + recall)
-        f1_ = np.nan_to_num(f1) * 100
-        metrics[f'F1@{int(overlap[s]*10)}'] = f1_
+    # F1 @ X
+    # if not is_train:
+    #     overlap = [.1, .25, .5] # F1 @ [10, 25, 50]
+    #     tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
+    #     for s in range(len(overlap)):
+    #         tp1, fp1, fn1 = f_score(preds, gt, overlap[s])
+    #         tp[s] += tp1
+    #         fp[s] += fp1
+    #         fn[s] += fn1
+    #     for s in range(len(overlap)):
+    #         precision = tp[s] / float(tp[s] + fp[s])
+    #         recall = tp[s] / float(tp[s] + fn[s])
+
+    #         f1_ = 2.0 * (precision * recall) / (precision + recall)
+    #         f1_ = np.nan_to_num(f1_) * 100
+    #         metrics[f'F1@{int(overlap[s]*10)}'] = f1_
 
     # confusion matrix
 
     # classification report
     report = get_classification_report(preds, gt, valid_dataloader.dataset.get_target_names())
-    metrics['report'] = report
+    # metrics['report'] = report
 
     return metrics
 
-
-
 def train_model(model, optimizer, criterion, train_dataloader):
 
-    epoch_train_losses, train_accuracy, train_edit_score = [], None, None
-
-    model.train()
+    epoch_train_losses = []
+    epoch_classification_losses = []
+    epoch_regression_losses = []
     running_loss = 0
 
+    model.train()
+    
     preds, gt = [], []
+    traj_preds, traj_gt = [], []
             
     for bi, (src, tgt, future_gesture, future_kinematics) in enumerate(tqdm(train_dataloader)):
 
         # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
         src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
-        future_gesture = future_gesture.transpose(0, 1)
         tgt = tgt[:, 1:].transpose(0, 1)
+        future_gesture = future_gesture.transpose(0, 1)
+        future_kinematics = future_kinematics.transpose(0, 1)
         
         # get the target mask
         # tgt_mask = get_tgt_mask(train_dataloader.dataset.prediction_window, device)
         tgt_mask = None
 
         # model outputs
-        logits = model(src, tgt, tgt_mask)
+        logits, traj = model(src, tgt, tgt_mask)
 
         # compute loss and step the optimizer
         optimizer.zero_grad()
@@ -82,11 +91,14 @@ def train_model(model, optimizer, criterion, train_dataloader):
             gt_output_torch = torch.argmax(future_gesture, dim=-1).reshape(-1)
         else:
             gt_output_torch = future_gesture.reshape(-1)
-        loss = criterion(logits.reshape(-1, logits.shape[-1]), gt_output_torch)
+        loss_classification = criterion[0](logits.reshape(-1, logits.shape[-1]), gt_output_torch)
+        loss_regression = criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
+        loss = loss_classification + loss_regression
         loss.backward()
         optimizer.step()
 
-        # store predictions and ground truth
+        ## store predictions and ground truth
+        # classification 
         preds_ = torch.argmax(logits.reshape(-1, logits.shape[-1]), dim=-1).reshape(-1).cpu().numpy().tolist()
         if one_hot:
             gt_ = torch.argmax(future_gesture.reshape(-1, future_gesture.shape[-1]), dim=-1).reshape(-1).cpu().numpy().tolsit()
@@ -95,23 +107,35 @@ def train_model(model, optimizer, criterion, train_dataloader):
         preds += preds_
         gt += gt_
 
+        # prediction
+        reg_preds = traj.reshape(-1, traj.shape[-1]).detach().cpu().numpy()
+        reg_gt = future_kinematics.reshape(-1, future_kinematics.shape[-1]).cpu().numpy()
+        traj_preds.append(reg_preds)
+        traj_gt.append(reg_gt)
+
+        # store the losses
+        epoch_classification_losses.append(loss_classification.item())
+        epoch_regression_losses.append(loss_regression.item())
         epoch_train_losses.append(loss.item())
 
         running_loss += loss.item()
-        # if bi % 50 == 0:
-        #     print(running_loss/50)
-        #     running_loss = 0
-    train_metrics = compute_metrics(preds, gt)
-    return np.mean(epoch_train_losses), train_metrics
+    traj_preds = np.concatenate(traj_preds)
+    traj_gt = np.concatenate(traj_gt)
+
+    train_metrics = compute_metrics(preds, gt, traj_preds, traj_gt, is_train=True)
+    return np.mean(epoch_train_losses), np.mean(epoch_classification_losses), np.mean(epoch_regression_losses), train_metrics
 
 def eval_model(model, criterion, valid_dataloader):
 
-    epoch_valid_losses, valid_accuracy, valid_edit_score = [], None, None
+    epoch_valid_losses = []
+    epoch_classification_losses = []
+    epoch_regression_losses = []
 
     model.eval()
     running_loss = 0
 
-    preds, probs, gt = [], []
+    preds, probs, gt = [], [], []
+    traj_preds, traj_gt = [], []
 
     with torch.no_grad():
             
@@ -119,22 +143,30 @@ def eval_model(model, criterion, valid_dataloader):
 
             # transpose inputs into the correct shape [seq_len, batch_size, features/classes]
             src = src.transpose(0, 1) # the srd tensor is of shape [batch_size, sequence_length, features_dim]; we transpose it to the proper dimension for the transformer model
-            future_gesture = future_gesture.transpose(0, 1)
             tgt = tgt[:, 1:].transpose(0, 1)
+            future_gesture = future_gesture.transpose(0, 1)
+            future_kinematics = future_kinematics.transpose(0, 1)
             
             # get the target mask
             # tgt_mask = get_tgt_mask(train_dataloader.dataset.prediction_window, device)
             tgt_mask = None
 
             # model outputs
-            logits = model(src, tgt, tgt_mask)
+            logits, traj = model(src, tgt, tgt_mask)
 
             # compute loss
             if one_hot:
                 gt_output_torch = torch.argmax(future_gesture, dim=-1).reshape(-1)
             else:
                 gt_output_torch = future_gesture.reshape(-1)
-            loss = criterion(logits.reshape(-1, logits.shape[-1]), gt_output_torch)
+            loss_classification = criterion[0](logits.reshape(-1, logits.shape[-1]), gt_output_torch)
+            loss_regression = criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
+            loss = loss_classification + loss_regression
+
+             #store the losses
+            epoch_classification_losses.append(loss_classification.item())
+            epoch_regression_losses.append(loss_regression.item())
+            epoch_valid_losses.append(loss.item())
 
             # store predictions and ground truth
             preds_ = torch.argmax(logits.reshape(-1, logits.shape[-1]), dim=-1).reshape(-1).cpu().numpy().tolist()
@@ -146,24 +178,126 @@ def eval_model(model, criterion, valid_dataloader):
             gt += gt_
             probs.append(logits.reshape(-1, logits.shape[-1]).cpu().numpy())
 
-            epoch_valid_losses.append(loss.item())
+            # prediction
+            reg_preds = traj.reshape(-1, traj.shape[-1]).cpu().numpy()
+            reg_gt = future_kinematics.reshape(-1, future_kinematics.shape[-1]).cpu().numpy()
+            traj_preds.append(reg_preds)
+            traj_gt.append(reg_gt)
 
-            # printing statistics
-            running_loss += loss.item()
-    probs = np.concatenate(probs, axis=0)
-    valid_metrics = compute_metrics(preds, gt)
+    traj_preds = np.concatenate(traj_preds)
+    traj_gt = np.concatenate(traj_gt)
     print(preds[:100])
     print(gt[:100])
-    return np.mean(epoch_valid_losses), valid_metrics
+    print(traj_preds[:2])
+    print(traj_gt[:2])
+
+    valid_metrics = compute_metrics(preds, gt, traj_preds, traj_gt, is_train=False)
+    return np.mean(epoch_valid_losses), np.mean(epoch_classification_losses), np.mean(epoch_regression_losses), valid_metrics
+
+def plot_loss(train_losses, valid_losses, loss_type: str):
+    plt.figure(figsize=(10, 8))
+    epochs = list(range(1, len(train_losses) + 1))
+    plt.plot(epochs, train_losses, label='Training Loss', marker='o', linestyle='-', color='blue')
+    plt.plot(epochs, valid_losses, label='Test Loss', marker='o', linestyle='-', color='red')
+    plt.xlabel(loss_type)
+    plt.ylabel('Loss')
+    plt.title('Training and Test Loss Over Epochs')
+    plt.legend()
+    plt.savefig(Path(f'./results/{experiment_name}/{loss_type}_fig_{subject_id_to_exclude}.png'))
+
+def plot_stacked_time_series(actual_series, predicted_series, series_names):
+    num_series = len(actual_series)
+    
+    # Create a figure and axes
+    fig, axes = plt.subplots(nrows=num_series, ncols=1, figsize=(10, 6*num_series))
+    
+    # Ensure axes is a list for consistent indexing
+    if not isinstance(axes, list):
+        axes = [axes]
+    
+    for i in range(num_series):
+        ax = axes[i]
+        actual_data = actual_series[i]
+        predicted_data = predicted_series[i]
+        name = series_names[i]
+
+        # Plot actual data in blue
+        ax.plot(np.arange(len(actual_data)), actual_data, label=f'Actual {name}', color='blue')
+
+        # Plot predicted data in red
+        ax.plot(np.arange(len(predicted_data)), predicted_data, label=f'Predicted {name}', color='red')
+
+        # Set labels and title
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Value')
+        ax.set_title(f'{name} Time Series')
+        
+        # Add legend
+        ax.legend()
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # Show the plot (optional)
+    plt.show()
+
+def print_trajectories(traj_preds, traj_gt):
+    pass
 
 def save_artifacts(model, train_records, valid_records, valid_dataloader):
-    Path(f'/results/{experiment_name}').mkdir(parents=True, exist_ok=True)
-    # save the losses for the current model and subject
-    # save the accuracy for the current model and subject
-    # save the model itself
+    Path(f'./results/{experiment_name}').mkdir(parents=True, exist_ok=True)
+
     # plot and save train vs. valid losses
+    train_losses, train_classification_losses, train_regression_losses, train_metrics = zip(*train_records)
+    valid_losses, valid_classification_losses, valid_regression_losses, valid_metrics = zip(*valid_records)
+
+    # plot the losses
+    plot_loss(train_losses, valid_losses, "Total Loss")
+    plot_loss(train_classification_losses, valid_classification_losses, "Gesture Prediction Loss")
+    plot_loss(train_regression_losses, valid_regression_losses, "Trajectory Prediciton Loss")
+    
+    # save the accuracy for the current model and subject
+    save_json_path_train = Path(f'./results/{experiment_name}/train_metrics.json')
+    o = 'r+' if save_json_path_train.exists() else 'w'
+    with open(str(save_json_path_train), o) as fp:
+        try:
+            f = json.load(fp)
+        except:
+            f = {}
+        f[subject_id_to_exclude] = train_metrics
+        json.dump(f, fp)
+    save_json_path_valid = Path(f'./results/{experiment_name}/valid_metrics.json')
+    with open(str(save_json_path_valid), o) as fp:
+        try:
+            f = json.load(fp)
+        except:
+            f = {}
+        f[subject_id_to_exclude] = valid_metrics
+        json.dump(f, fp)
+    
+    # save the model itself
+    torch.save(model.state_dict(), Path(f'./results/{experiment_name}/model_{subject_id_to_exclude}.pth'))
+
     # plot the predictions for a sample trial from the valid set
-    pass
+    X, Y, Y_future, P_future = valid_dataloader.dataset.get_trial(trial_id=1, window_size=valid_dataloader.dataset.observation_window_size)
+    num_batches = X.shape[0]//batch_size
+    predictions, ground_truth = [], []
+    traj_predictions, traj_ground_truth = [], []
+    for j in range(num_batches):
+        # get the data
+        x = X[j*batch_size:(j+1)*batch_size].transpose(0, 1)
+        y = Y[j*batch_size:(j+1)*batch_size].transpose(0, 1)
+        yf = Y_future[j*batch_size:(j+1)*batch_size]
+        p = P_future[j*batch_size:(j+1)*batch_size]
+
+        # compute model outputs
+        gesture_outs, trajectory_outs = model(x, y, None)
+
+        preds = torch.argmax(gesture_outs, dim=-1).transpose(0, 1).reshape(-1).cpu().numpy().tolist()
+        predictions += preds
+        ground_truth += yf.reshape(-1).cpu().numpy().tolist()
+    save_path = Path(f'./results/{experiment_name}/barplot_{subject_id_to_exclude}.png')
+    plot_bars(ground_truth, predictions, save_path=save_path)
 
 ### -------------------------- DATA -----------------------------------------------------
 tasks = ["Suturing"]
@@ -191,6 +325,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
                                                         one_hot=one_hot,
                                                         class_names=class_names['Suturing'],
                                                         feature_names=Features,
+                                                        trajectory_feature_names=trajectory_feature_names,
                                                         include_resnet_features=include_resnet_features,
                                                         include_segmentation_features=include_segmentation_features,
                                                         include_colin_features=include_colin_features,
@@ -239,6 +374,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
                  emb_dim=args['emb_dim'],
                  nhead=args['nhead'],
                  tgt_vocab_size=len(train_dataloader.dataset.get_target_names()),
+                 tgt_reg_size=len(trajectory_feature_names),
                  max_encoder_len=observation_window,
                  max_decoder_len=prediction_window,
                  decoder_embedding_dim=args['decoder_embedding_dim'],
@@ -254,7 +390,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
     optimizer = optimizer_cls(model.parameters(), lr=args['lr'], weight_decay=args['weight_decay'])
 
     # build the criterion
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = (torch.nn.CrossEntropyLoss(), torch.nn.MSELoss())
 
     #----------------------------------------Training Loop-------------------------------------------------
     experiment_name = 'transformer_kin_context'
@@ -262,17 +398,14 @@ for subject_id_to_exclude in range(2, 9 + 1):
     epochs = 20
     train_records, valid_records = [], []
     for epoch in range(epochs):
-        epoch_train_loss, train_metrics = train_model(model, optimizer, criterion, train_dataloader)
-        epoch_valid_loss, valid_metrics = eval_model(model, criterion, valid_dataloader)
+        epoch_train_loss, epoch_train_classification_loss, epoch_train_regression_loss, train_metrics = train_model(model, optimizer, criterion, train_dataloader)
+        epoch_valid_loss, epoch_valid_classification_loss, epoch_valid_regression_loss, valid_metrics = eval_model(model, criterion, valid_dataloader)
 
-        train_records.append((epoch_train_loss, train_metrics))
-        valid_records.append((epoch_valid_loss, valid_metrics))
+        train_records.append((epoch_train_loss, epoch_train_classification_loss, epoch_train_regression_loss, train_metrics))
+        valid_records.append((epoch_valid_loss, epoch_valid_classification_loss, epoch_valid_regression_loss, valid_metrics))
 
-        print(f"Train Results Subject {subject_id_to_exclude} Epoch {epoch}:", train_metrics['accuracy'], train_metrics['edit_score'], epoch_train_loss)
-        print(f"Validation Results Subject {subject_id_to_exclude} Epoch {epoch}:", valid_metrics['accuracy'], valid_metrics['edit_score'], epoch_valid_loss)
-    # print(train_records)
-    # print('\n\n')
-    # print(valid_records)
+        print(f"\n\nTrain Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", "MSE: \n", train_metrics['MSE'], "MAPE: \n", train_metrics['MAPE'], epoch_train_loss)
+        print(f"\n\nValid Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", "MSE: \n", valid_metrics['MSE'], "MAPE: \n", valid_metrics['MAPE'], epoch_valid_loss)
     
     # save model, accuracy, edit_score, loss-plots for the current subject
-    # save_artifacts(model, train_records, valid_records, valid_dataloader)
+    save_artifacts(model, train_records, valid_records, valid_dataloader)

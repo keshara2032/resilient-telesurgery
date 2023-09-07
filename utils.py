@@ -27,6 +27,7 @@ def get_dataloaders(tasks: List[str],
                     one_hot: bool,
                     class_names: List[str],
                     feature_names: List[str],
+                    trajectory_feature_names: List[str],
                     include_resnet_features: bool,
                     include_segmentation_features: bool,
                     include_colin_features: bool,
@@ -87,8 +88,8 @@ def get_dataloaders(tasks: List[str],
 
     segmentation_features_train, segmentation_features_valid = [], []   
     
-    train_dataset = LOUO_Dataset(train_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, resnet_files_path=train_resnet_files, colin_files_path=colin_features_train, segmentation_files_path=segmentation_features_train, normalizer=normalizer, sliding_window=True)
-    valid_dataset = LOUO_Dataset(valid_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, resnet_files_path=valid_resnet_files, colin_files_path=colin_features_valid, segmentation_files_path=segmentation_features_valid, normalizer=normalizer, sliding_window=False)
+    train_dataset = LOUO_Dataset(train_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, trajectory_feature_names=trajectory_feature_names, resnet_files_path=train_resnet_files, colin_files_path=colin_features_train, segmentation_files_path=segmentation_features_train, normalizer=normalizer, sliding_window=True)
+    valid_dataset = LOUO_Dataset(valid_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, trajectory_feature_names=trajectory_feature_names, resnet_files_path=valid_resnet_files, colin_files_path=colin_features_valid, segmentation_files_path=segmentation_features_valid, normalizer=normalizer, sliding_window=False)
 
     target_type = torch.float32 if one_hot else torch.long
     train_dataloader = DataLoader(train_dataset, shuffle=False, batch_size=batch_size, collate_fn=partial(LOUO_Dataset.collate_fn, device=device, target_type=target_type, cast=cast))

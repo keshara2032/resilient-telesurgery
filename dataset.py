@@ -53,6 +53,7 @@ class LOUO_Dataset(Dataset):
                 onehot: bool = False,
                 class_names: List[str] = [],
                 feature_names: List[str] = [],
+                trajectory_feature_names: List[str] = [],
                 resnet_files_path: List[str] = [],
                 colin_files_path: List[str] = [],
                 segmentation_files_path: List[str] = [],
@@ -81,6 +82,8 @@ class LOUO_Dataset(Dataset):
         # reading the data (kinematic features, [image features, context features])
         (self.X, self.Y) = self._load_data() 
         self.feature_names = self.feature_names_
+
+        self.traj_features_indices = [self.feature_names.index(feature) for feature in trajectory_feature_names]
 
         # feature normalization
         if normalizer:
@@ -123,7 +126,7 @@ class LOUO_Dataset(Dataset):
                 X.append(_X[i*window_size:(i+1)*window_size])
                 Y.append(_Y[i*window_size:(i+1)*window_size])
                 Y_future.append(_Y[(i+1)*window_size:(i+2)*window_size])
-                P.append(_X[(i+1)*window_size:(i+2)*window_size])
+                P.append(_X[(i+1)*window_size:(i+2)*window_size, self.traj_features_indices])
             X = np.array(X)
             Y = np.array(Y)
             Y_future = np.array(Y_future)
@@ -254,7 +257,7 @@ class LOUO_Dataset(Dataset):
         features = self.X[start_idx : end_index]
         target = self.Y[start_idx-1 : end_index] # one additional observation is given for recursive decoding in recognition task
         gesture_pred_target = self.Y[end_index : end_index + self.prediction_window_size]
-        traj_pred_target = self.X[end_index : end_index + self.prediction_window_size]
+        traj_pred_target = self.X[end_index : end_index + self.prediction_window_size, self.traj_features_indices]
         
         # return kinematic_features, image_features, target, gesture_pred_target, traj_pred_target
         return features, target, gesture_pred_target, traj_pred_target

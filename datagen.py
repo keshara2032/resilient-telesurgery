@@ -51,6 +51,7 @@ kinematic_feature_names_jigsaws_no_rot_ps = ["PSML_position_x", "PSML_position_y
                                         "PSMR_position_x", "PSMR_position_y", "PSMR_position_z",
                                         "PSMR_velocity_x", "PSMR_velocity_y", "PSMR_velocity_z",
                                         "PSMR_gripper_angle"]
+trajectory_feature_names = ["PSML_position_x", "PSML_position_y", "PSML_position_z", "PSMR_position_x", "PSMR_position_y", "PSMR_position_z"]
 
 ## CONTEXT ##
 state_variables = ['left_holding', 'left_contact', 'right_holding', 'right_contact', 'needle_state']
