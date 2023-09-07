@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
 
 
 from dataset import LOUO_Dataset
-from datagen import colin_train_test_splits, colin_features_save_path
+from datagen import colin_train_test_splits, colin_features_save_path, segmentation_features_save_path
 
 def get_normalizer(normalization_type):
     if normalization_type == 'standardization':
@@ -86,7 +86,16 @@ def get_dataloaders(tasks: List[str],
             colin_features_train += list(map(lambda x : os.path.join(colin_features_save_path, 'data', task, colin_root_for_task[-7:], x+'.avi.mat'), train_files))
             colin_features_valid += list(map(lambda x : os.path.join(colin_features_save_path, 'data', task, colin_root_for_task[-7:], x+'.avi.mat'), test_files))
 
-    segmentation_features_train, segmentation_features_valid = [], []   
+    segmentation_features_train, segmentation_features_valid = [], []
+    if include_segmentation_features:
+        for file in train_kin_files:
+            file_base = os.path.basename(file)
+            seg_path = os.path.join(segmentation_features_save_path, file_base[9:])
+            segmentation_features_train.append(seg_path)
+        for file in valid_kin_files:
+            file_base = os.path.basename(file)
+            seg_path = os.path.join(segmentation_features_save_path, file_base[9:])
+            segmentation_features_valid.append(seg_path) 
     
     train_dataset = LOUO_Dataset(train_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, trajectory_feature_names=trajectory_feature_names, resnet_files_path=train_resnet_files, colin_files_path=colin_features_train, segmentation_files_path=segmentation_features_train, normalizer=normalizer, sliding_window=True)
     valid_dataset = LOUO_Dataset(valid_kin_files, observation_window, prediction_window, step=step, onehot=one_hot, class_names=class_names, feature_names=feature_names, trajectory_feature_names=trajectory_feature_names, resnet_files_path=valid_resnet_files, colin_files_path=colin_features_valid, segmentation_files_path=segmentation_features_valid, normalizer=normalizer, sliding_window=False)

@@ -65,7 +65,7 @@ class LOUO_Dataset(Dataset):
         self.kin_files_path = kin_files_path
         self.resnet_files_path = resnet_files_path
         self.colin_files_path = colin_files_path
-        segmentation_files_path = segmentation_files_path
+        self.segmentation_files_path = segmentation_files_path
         self.observation_window_size = observation_window_size
         self.prediction_window_size = prediction_window_size
         self.target_names = class_names
@@ -164,8 +164,13 @@ class LOUO_Dataset(Dataset):
                 if self.colin_files_path:
                     colin_features_path = self.colin_files_path[i]
                     colin_features = sio.loadmat(colin_features_path)['A']
+                    colin_features = np.repeat(colin_features, repeats=3, axis=0)
 
-                if self.step > 0:
+                if self.segmentation_files_path:
+                    segmentation_features = pd.read_csv(self.segmentation_files_path[i], header=None)
+                    segmentation_features = np.repeat(segmentation_features, repeats=3, axis=0)
+
+                if self.step > 1:
                     if self.colin_files_path:
                         assert self.step in [3, 6], 'When using colin features, which is computed in 10 Hz, you must choose step=3 (10Hz) or 6(5Hz)'
                         if self.step == 6:
@@ -174,6 +179,8 @@ class LOUO_Dataset(Dataset):
                     kin_label = kin_label.loc[pd.RangeIndex(start=0, stop=len(kin_label), step=self.step)].reset_index(drop=True)
                     if self.resnet_files_path:
                         resnet_features = resnet_features[::self.step]
+                    if self.segmentation_files_path:
+                        segmentation_features = segmentation_features[::self.step]
                 
                 # limit by the length of the smaller tensor, image or kin
                 last_index = len(kin_data)
@@ -187,6 +194,8 @@ class LOUO_Dataset(Dataset):
                     resnet_features = resnet_features[:last_index]
                 if self.colin_files_path:
                     colin_features = colin_features[:last_index]
+                if self.segmentation_files_path:
+                    segmentation_features = segmentation_features[:last_index]
 
                 # drop the frames where the label does not exist
                 drop_ind = kin_label[kin_label == '-'].index
@@ -196,14 +205,20 @@ class LOUO_Dataset(Dataset):
                     resnet_features = np.delete(resnet_features, drop_ind.tolist(), axis=0)
                 if self.colin_files_path:
                     colin_features = np.delete(colin_features, drop_ind.tolist(), axis=0)
+                if self.segmentation_files_path:
+                    segmentation_features = np.delete(segmentation_features, drop_ind.tolist(), axis=0)
                 
                 if self.resnet_files_path:
                     X_image_subject = resnet_features
                     if self.colin_files_path:
                         X_image_subject = np.concatenate([X_image_subject, colin_features], axis=1)
+                    if self.segmentation_files_path:
+                        X_image_subject = np.concatenate([X_image_subject, segmentation_features], axis=1)
                 else:
                     if self.colin_files_path:
                         X_image_subject = colin_features
+                    if self.segmentation_files_path:
+                        X_image_subject = np.concatenate([X_image_subject, segmentation_features], axis=1)
                     else:
                         X_image_subject = None
                 if X_image_subject is not None:
@@ -238,6 +253,8 @@ class LOUO_Dataset(Dataset):
             self.feature_names_ += [f'resnet_{i}' for i in range(resnet_features.shape[1])]
         if self.colin_files_path:
             self.feature_names_ += [f'colin_{i}' for i in range(colin_features.shape[1])]
+        if self.segmentation_files_path:
+            self.feature_names_ += [f'seg_{i}' for i in range(segmentation_features.shape[1])]
         Y = np.concatenate(Y)
 
         return X, Y

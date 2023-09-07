@@ -74,6 +74,9 @@ colin_train_test_splits = {
     } 
 }
 
+## SEGMENTATION FEATURES
+segmentation_features_save_path = "./segmentation_masks/pca_features_normalized"
+
 
 def generate_data(task: str):
     processed_data_path = "./ProcessedDatasets"
