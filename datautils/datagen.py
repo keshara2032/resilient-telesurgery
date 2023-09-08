@@ -57,6 +57,8 @@ state_variables = ['left_holding', 'left_contact',
 
 img_features = ["resnet_" + str(i) for i in range(2048)]
 
+segmentation_features = ["seg_" + str(i) for i in range(128)]
+
 state_variables_repeating_factor = 10
 
 image_features_save_path = './ImageFeatures'

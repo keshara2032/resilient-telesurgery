@@ -39,7 +39,7 @@ tcn_model_params = {
 
 transformer_params = {
     "d_model": 128,
-    "nhead": 4,
+    "nhead": 16,
     "num_layers": 2,
     "hidden_dim": 128,
     "layer_dim": 4,
@@ -74,8 +74,8 @@ dataloader_params = {
     "cast": True,
     "include_image_features": False,
     "normalizer": '',  # ('standardization', 'min-max', 'power', '')
-    "step": 1,  # 1 - 30 Hz
-    "context": 9  # 0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context, 6-colin_features, 7- colin+context, 8-colin+kin, 9-colin+kin+context
+    "step": 3,  # 1 - 30 Hz
+    "context": 6  # 0-nocontext, 1-contextonly, 2-context+kin, 3-imageonly, 4-image+kin, 5-image+kin+context, 6-colin_features, 7- colin+context, 8-colin+kin, 9-colin+kin+context, 10-segonly, 11-kin+seg, 12-kin+seg+context, 13-kin+seg+context+colins, 14-seg+colins
     # hamid -  do not need (1,3,5,7)
     
 }

@@ -17,7 +17,7 @@ from functools import partial
 import torch.nn.functional as F
 from timeit import default_timer as timer
 from datautils.utils import get_dataloaders
-from datautils.datagen import kinematic_feature_names,colin_features, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_patient_position, class_names, all_class_names, state_variables
+from datautils.datagen import kinematic_feature_names,colin_features, segmentation_features, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_patient_position, class_names, all_class_names, state_variables
 from tqdm import tqdm
 from collections import OrderedDict
 from config import *
@@ -100,6 +100,26 @@ elif(context == 8): # colin + kinematic 14
 elif(context == 9): # colin + kinematic 14  + context
     Features = colin_features + kinematic_feature_names_jigsaws_patient_position + state_variables
    
+   
+elif(context == 10): # segonly
+    Features = segmentation_features
+
+   
+elif(context == 11): # kin+seg
+    Features = segmentation_features + kinematic_feature_names_jigsaws_patient_position 
+   
+   
+   
+elif(context == 12): # kin + seg + context
+    Features = segmentation_features + kinematic_feature_names_jigsaws_patient_position + state_variables
+    
+    
+elif(context == 13): # kin + seg + context + colin
+    Features = segmentation_features + colin_features + kinematic_feature_names_jigsaws_patient_position + state_variables
+
+elif(context == 14): # kin + seg + context + colin
+    Features = segmentation_features + colin_features  + state_variables + kinematic_feature_names_jigsaws_patient_position
+
 epochs = learning_params["epochs"]
 observation_window = dataloader_params["observation_window"],
 
