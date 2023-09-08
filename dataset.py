@@ -208,21 +208,20 @@ class LOUO_Dataset(Dataset):
                 if self.segmentation_files_path:
                     segmentation_features = np.delete(segmentation_features, drop_ind.tolist(), axis=0)
                 
+                X_image_subject = []
+
                 if self.resnet_files_path:
-                    X_image_subject = resnet_features
-                    if self.colin_files_path:
-                        X_image_subject = np.concatenate([X_image_subject, colin_features], axis=1)
-                    if self.segmentation_files_path:
-                        X_image_subject = np.concatenate([X_image_subject, segmentation_features], axis=1)
-                else:
-                    if self.colin_files_path:
-                        X_image_subject = colin_features
-                    if self.segmentation_files_path:
-                        X_image_subject = np.concatenate([X_image_subject, segmentation_features], axis=1)
-                    else:
-                        X_image_subject = None
-                if X_image_subject is not None:
+                    X_image_subject.append(resnet_features)
+                if self.colin_files_path:
+                    X_image_subject.append(colin_features)
+                if self.segmentation_files_path:
+                    X_image_subject.append(segmentation_features)
+                if len(X_image_subject) > 0:
+                    X_image_subject = np.concatenate(X_image_subject, axis=1)
+
+                if len(X_image_subject) > 1:
                     X_image.append(X_image_subject)
+
                 X.append(kin_data.values)
                 Y.append(kin_label.values)
                 self.samples_per_trial.append(len(kin_data))

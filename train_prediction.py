@@ -8,12 +8,12 @@ import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error, mean_absolute_error
 from tqdm import tqdm
 from timeit import default_timer as timer
 from utils import get_dataloaders
 from datagen import kinematic_feature_names, trajectory_feature_names, kinematic_feature_names_jigsaws, kinematic_feature_names_jigsaws_no_rot_ps, class_names, all_class_names, state_variables
-from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence, f_score, get_classification_report
+from models.utils import plot_bars, get_tgt_mask, compute_edit_score, merge_gesture_sequence, f_score, get_classification_report, ScheduledOptim
 
 import warnings
 # warnings.filterwarnings('ignore')
@@ -28,10 +28,13 @@ def compute_metrics(preds, gt, regression_preds, regressoin_gt, is_train=False):
     metrics['accuracy'] = np.mean(np.array(preds) == np.array(gt))
 
     # edit score
-    metrics['edit_score'] = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
+    if not is_train:
+        metrics['edit_score'] = compute_edit_score(merge_gesture_sequence(gt), merge_gesture_sequence(preds))
 
-    metrics['MSE'] = {k: v for k, v in zip(trajectory_feature_names, mean_squared_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
-    metrics['MAPE'] = {k: v for k, v in zip(trajectory_feature_names, mean_absolute_percentage_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
+    rmse = {'RMSE_'+k: v for k, v in zip(trajectory_feature_names, np.sqrt(mean_squared_error(regressoin_gt, regression_preds, multioutput='raw_values')).reshape(-1).tolist())}
+    mae = {'MAE_'+k: v for k, v in zip(trajectory_feature_names, mean_absolute_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
+    mape = {'MAPE_'+k: v for k, v in zip(trajectory_feature_names, mean_absolute_percentage_error(regressoin_gt, regression_preds, multioutput='raw_values').reshape(-1).tolist())}
+    metrics = metrics | rmse | mape | mae
 
     # F1 @ X
     # if not is_train:
@@ -92,7 +95,7 @@ def train_model(model, optimizer, criterion, train_dataloader):
         else:
             gt_output_torch = future_gesture.reshape(-1)
         loss_classification = criterion[0](logits.reshape(-1, logits.shape[-1]), gt_output_torch)
-        loss_regression = criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
+        loss_regression = args['regression_loss_multiplier']*criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
         loss = loss_classification + loss_regression
         loss.backward()
         optimizer.step()
@@ -160,7 +163,7 @@ def eval_model(model, criterion, valid_dataloader):
             else:
                 gt_output_torch = future_gesture.reshape(-1)
             loss_classification = criterion[0](logits.reshape(-1, logits.shape[-1]), gt_output_torch)
-            loss_regression = criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
+            loss_regression = args['regression_loss_multiplier']*criterion[1](traj.reshape(-1, traj.shape[-1]), future_kinematics.reshape(-1, future_kinematics.shape[-1]))
             loss = loss_classification + loss_regression
 
              #store the losses
@@ -199,21 +202,24 @@ def plot_loss(train_losses, valid_losses, loss_type: str):
     epochs = list(range(1, len(train_losses) + 1))
     plt.plot(epochs, train_losses, label='Training Loss', marker='o', linestyle='-', color='blue')
     plt.plot(epochs, valid_losses, label='Test Loss', marker='o', linestyle='-', color='red')
-    plt.xlabel(loss_type)
+    plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training and Test Loss Over Epochs')
+    plt.yscale('log')
+    plt.title(loss_type)
     plt.legend()
-    plt.savefig(Path(f'./results/{experiment_name}/{loss_type}_fig_{subject_id_to_exclude}.png'))
+    plt.savefig(Path(f'./results/{experiment_name}/plots/{loss_type}_fig_{subject_id_to_exclude}.png'))
 
-def plot_stacked_time_series(actual_series, predicted_series, series_names):
+def plot_stacked_time_series(actual_series, predicted_series, series_names, save_path):
     num_series = len(actual_series)
     
+    print(actual_series.shape, predicted_series.shape, series_names)
     # Create a figure and axes
     fig, axes = plt.subplots(nrows=num_series, ncols=1, figsize=(10, 6*num_series))
     
     # Ensure axes is a list for consistent indexing
-    if not isinstance(axes, list):
-        axes = [axes]
+    # if not isinstance(axes, list):
+    #     print('helooooooooooooooooooooooo')
+    #     axes = [axes]
     
     for i in range(num_series):
         ax = axes[i]
@@ -239,17 +245,18 @@ def plot_stacked_time_series(actual_series, predicted_series, series_names):
     plt.tight_layout()
 
     # Show the plot (optional)
-    plt.show()
-
-def print_trajectories(traj_preds, traj_gt):
-    pass
+    plt.savefig(save_path)
 
 def save_artifacts(model, train_records, valid_records, valid_dataloader):
     Path(f'./results/{experiment_name}').mkdir(parents=True, exist_ok=True)
+    Path(f'./results/{experiment_name}', 'plots').mkdir(exist_ok=True) 
 
     # plot and save train vs. valid losses
     train_losses, train_classification_losses, train_regression_losses, train_metrics = zip(*train_records)
     valid_losses, valid_classification_losses, valid_regression_losses, valid_metrics = zip(*valid_records)
+    # only keep the metrics from the last epoch
+    train_metrics = train_metrics[-1]
+    valid_metrics = valid_metrics[-1] 
 
     # plot the losses
     plot_loss(train_losses, valid_losses, "Total Loss")
@@ -257,23 +264,22 @@ def save_artifacts(model, train_records, valid_records, valid_dataloader):
     plot_loss(train_regression_losses, valid_regression_losses, "Trajectory Prediciton Loss")
     
     # save the accuracy for the current model and subject
-    save_json_path_train = Path(f'./results/{experiment_name}/train_metrics.json')
-    o = 'r+' if save_json_path_train.exists() else 'w'
-    with open(str(save_json_path_train), o) as fp:
-        try:
-            f = json.load(fp)
-        except:
-            f = {}
-        f[subject_id_to_exclude] = train_metrics
-        json.dump(f, fp)
-    save_json_path_valid = Path(f'./results/{experiment_name}/valid_metrics.json')
-    with open(str(save_json_path_valid), o) as fp:
-        try:
-            f = json.load(fp)
-        except:
-            f = {}
-        f[subject_id_to_exclude] = valid_metrics
-        json.dump(f, fp)
+    print(train_metrics)
+    save_df_path_train = Path(f'./results/{experiment_name}/train_metrics.csv')
+    if not save_df_path_train.exists():
+        train_df = pd.DataFrame.from_dict(train_metrics, orient='index').T
+    else:
+        train_df = pd.read_csv(save_df_path_train, index_col=0)
+    train_df.loc[subject_id_to_exclude] = train_metrics
+    train_df.to_csv(save_df_path_train, header=True, index=True)
+
+    save_df_path_valid = Path(f'./results/{experiment_name}/valid_metrics.csv')
+    if not save_df_path_valid.exists():
+        valid_df = pd.DataFrame.from_dict(valid_metrics, orient='index').T
+    else:
+        valid_df = pd.read_csv(save_df_path_valid, index_col=0)
+    valid_df.loc[subject_id_to_exclude] = valid_metrics
+    valid_df.to_csv(save_df_path_valid, header=True, index=True)
     
     # save the model itself
     torch.save(model.state_dict(), Path(f'./results/{experiment_name}/model_{subject_id_to_exclude}.pth'))
@@ -296,13 +302,23 @@ def save_artifacts(model, train_records, valid_records, valid_dataloader):
         preds = torch.argmax(gesture_outs, dim=-1).transpose(0, 1).reshape(-1).cpu().numpy().tolist()
         predictions += preds
         ground_truth += yf.reshape(-1).cpu().numpy().tolist()
-    save_path = Path(f'./results/{experiment_name}/barplot_{subject_id_to_exclude}.png')
+        traj_predictions.append(trajectory_outs.detach().transpose(0, 1).reshape(-1, trajectory_outs.shape[-1]).cpu().numpy())
+        traj_ground_truth.append(p.reshape(-1, p.shape[-1]).cpu().numpy())
+
+    # save trial regression results
+    save_path = Path(f'./results/{experiment_name}/plots/trial_traj_{subject_id_to_exclude}.png')
+    trial_traj_predictions = np.concatenate(traj_predictions, axis=0)
+    trial_traj_gt = np.concatenate(traj_ground_truth, axis=0)
+    plot_stacked_time_series(trial_traj_predictions.T, trial_traj_gt.T, trajectory_feature_names, str(save_path))
+
+    # save trial classification results
+    save_path = Path(f'./results/{experiment_name}/plots//trail_barplot_{subject_id_to_exclude}.png')
     plot_bars(ground_truth, predictions, save_path=save_path)
 
 ### -------------------------- DATA -----------------------------------------------------
 tasks = ["Suturing"]
-Features = kinematic_feature_names_jigsaws[38:] #kinematic features + state variable features
-# Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
+# Features = kinematic_feature_names_jigsaws[38:]  #kinematic features + state variable features
+Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
 
 one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -311,8 +327,8 @@ prediction_window = 10
 batch_size = 64
 cast = True
 include_resnet_features = False
-include_colin_features=False
-include_segmentation_features=False
+include_colin_features = False
+include_segmentation_features = True
 normalizer = '' # ('standardization', 'min-max', 'power', '')
 step = 3 # 10 Hz
 
@@ -355,16 +371,17 @@ for subject_id_to_exclude in range(2, 9 + 1):
     model_name = 'transformer'
     from models.transformer import TransformerEncoderDecoderModel
     args = dict(
-        num_encoder_layers = 1,
-        num_decoder_layers = 1,
-        emb_dim = 64,
-        dropout = 0.4,
+        num_encoder_layers = 3,
+        num_decoder_layers = 3,
+        emb_dim = 128,
+        dropout = 0.5,
         optimizer_type = 'Adam',
         weight_decay = 0.001,
-        lr = 1e-5,
+        lr = 1e-4,
         nhead = 4,
-        dim_feedforward = 512,
-        decoder_embedding_dim = 32
+        dim_feedforward = 1024,
+        decoder_embedding_dim = 8,
+        regression_loss_multiplier = 1000
     )
 
     model = TransformerEncoderDecoderModel(encoder_input_dim=len(train_dataloader.dataset.get_feature_names()),
@@ -388,6 +405,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
     elif args['optimizer_type'] == 'AdamW':
         optimizer_cls = torch.optim.AdamW
     optimizer = optimizer_cls(model.parameters(), lr=args['lr'], weight_decay=args['weight_decay'])
+    # optimizer = ScheduledOptim(base_optimizer, args['lr'], args['emb_dim'], 1000)
 
     # build the criterion
     criterion = (torch.nn.CrossEntropyLoss(), torch.nn.MSELoss())
@@ -395,7 +413,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
     #----------------------------------------Training Loop-------------------------------------------------
     experiment_name = 'transformer_kin_context'
     results = {}
-    epochs = 20
+    epochs = 5
     train_records, valid_records = [], []
     for epoch in range(epochs):
         epoch_train_loss, epoch_train_classification_loss, epoch_train_regression_loss, train_metrics = train_model(model, optimizer, criterion, train_dataloader)
@@ -404,8 +422,8 @@ for subject_id_to_exclude in range(2, 9 + 1):
         train_records.append((epoch_train_loss, epoch_train_classification_loss, epoch_train_regression_loss, train_metrics))
         valid_records.append((epoch_valid_loss, epoch_valid_classification_loss, epoch_valid_regression_loss, valid_metrics))
 
-        print(f"\n\nTrain Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", "MSE: \n", train_metrics['MSE'], "MAPE: \n", train_metrics['MAPE'], epoch_train_loss)
-        print(f"\n\nValid Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", "MSE: \n", valid_metrics['MSE'], "MAPE: \n", valid_metrics['MAPE'], epoch_valid_loss)
+        print(f"\n\nTrain Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", train_metrics, '\n', 'Total Loss: ', epoch_train_loss, "Classification Loss: ", epoch_train_classification_loss, "Regression Loss: ", epoch_train_regression_loss)
+        print(f"\n\nValid Results Subject {subject_id_to_exclude} Epoch {epoch}:\n", valid_metrics, '\n',  'Total Loss: ', epoch_valid_loss, "Classification Loss: ", epoch_valid_classification_loss, "Regression Loss: ", epoch_valid_regression_loss)
     
     # save model, accuracy, edit_score, loss-plots for the current subject
     save_artifacts(model, train_records, valid_records, valid_dataloader)

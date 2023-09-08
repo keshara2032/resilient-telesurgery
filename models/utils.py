@@ -80,7 +80,6 @@ class ScheduledOptim():
 
         self.n_steps += 1
         lr = self.lr_mul * self._get_lr_scale()
-
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
 
