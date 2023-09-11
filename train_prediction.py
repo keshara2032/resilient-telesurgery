@@ -317,22 +317,22 @@ def save_artifacts(model, train_records, valid_records, valid_dataloader):
 
 ### -------------------------- DATA -----------------------------------------------------
 tasks = ["Suturing"]
-# Features = kinematic_feature_names_jigsaws[38:]  #kinematic features + state variable features
-Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
+Features = kinematic_feature_names_jigsaws[38:] + state_variables  #kinematic features + state variable features
+# Features = kinematic_feature_names_jigsaws_no_rot_ps + state_variables
 
 one_hot = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 observation_window = 10
 prediction_window = 10
-batch_size = 64
+batch_size = 16
 cast = True
 include_resnet_features = False
 include_colin_features = False
-include_segmentation_features = True
+include_segmentation_features = False
 normalizer = '' # ('standardization', 'min-max', 'power', '')
 step = 3 # 10 Hz
 
-for subject_id_to_exclude in range(2, 9 + 1):
+for subject_id_to_exclude in [5]:
     train_dataloader, valid_dataloader = get_dataloaders(tasks=tasks,
                                                         subject_id_to_exclude=subject_id_to_exclude,
                                                         observation_window=observation_window,
@@ -381,7 +381,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
         nhead = 4,
         dim_feedforward = 1024,
         decoder_embedding_dim = 8,
-        regression_loss_multiplier = 1000
+        regression_loss_multiplier = 1500
     )
 
     model = TransformerEncoderDecoderModel(encoder_input_dim=len(train_dataloader.dataset.get_feature_names()),
@@ -413,7 +413,7 @@ for subject_id_to_exclude in range(2, 9 + 1):
     #----------------------------------------Training Loop-------------------------------------------------
     experiment_name = 'transformer_kin_context'
     results = {}
-    epochs = 5
+    epochs = 20
     train_records, valid_records = [], []
     for epoch in range(epochs):
         epoch_train_loss, epoch_train_classification_loss, epoch_train_regression_loss, train_metrics = train_model(model, optimizer, criterion, train_dataloader)
