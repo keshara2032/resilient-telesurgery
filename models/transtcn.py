@@ -3,7 +3,29 @@ import torch
 import torch.nn as nn
 
 from .unet import *
+import math
 
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        if d_model%2 != 0:
+            pe[:, 1::2] = torch.cos(position * div_term)[:,0:-1]
+        else:
+            pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
+    
 class GlobalMaxPooling1D(nn.Module):
 
     def __init__(self, data_format='channels_last'):
@@ -65,10 +87,10 @@ class CNN_Encoder(nn.Module):
         super(CNN_Encoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Conv1d(in_channels=in_channels, out_channels=64, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
+            nn.Conv1d(in_channels=in_channels, out_channels=128, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride = 2),
-            nn.Conv1d(in_channels=64, out_channels=96, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
+            nn.Conv1d(in_channels=128, out_channels=96, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride = 2),
             nn.Conv1d(in_channels=96, out_channels=out_channels, kernel_size=kernel_size, stride=1, padding=kernel_size//2),
@@ -130,6 +152,7 @@ class TransformerModel(nn.Module):
         num_f_maps = 64
         features_dim = 2048
         
+        self.pe = PositionalEncoding(d_model=d_model,max_len=32, dropout=dropout)
         self.fc = nn.Linear(input_dim, features_dim)
         
         # self.msrnn = MultiStageModel(num_stages, num_layers, num_f_maps, features_dim, output_dim)
@@ -151,17 +174,19 @@ class TransformerModel(nn.Module):
         
         x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
+        # x = self.pe(x)
+        
         x = self.transformer(x)
         
-        x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
+        # x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
-        x = self.decoder(x)
+        # x = self.decoder(x)
         
-        x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
+        # x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
-        x = self.max_pool(x) # gets rid of seq_len
 
-        # x = self.out(x)
+        x = self.out(x)
+        x = self.max_pool(x) # gets rid of seq_len
         
         return x
         

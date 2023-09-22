@@ -8,12 +8,83 @@ from tqdm import tqdm
 import pandas as pd
 import time
 import os
+import editdistance
+import itertools
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def merge_gesture_sequence(seq):
+    merged_seq = list()
+    for g, _ in itertools.groupby(seq): merged_seq.append(g)
+    return merged_seq
+
+def get_labels(frame_wise_labels):
+    labels = []
+
+    tmp = [0]
+    count = 0
+    for key, group in itertools.groupby(frame_wise_labels):
+        action_len = len(list(group))
+        tmp.append(tmp[count] + action_len)
+        count += 1
+        labels.append(key)
+    starts = tmp[:-1]
+    ends = tmp[1:]
+
+    return labels, starts, ends
+
+
+def f_score(predicted, ground_truth, overlap):
+    p_label, p_start, p_end = get_labels(predicted)
+    y_label, y_start, y_end = get_labels(ground_truth)
+
+    tp = 0
+    fp = 0
+
+    hits = np.zeros(len(y_label))
+
+    for j in range(len(p_label)):
+        intersection = np.minimum(p_end[j], y_end) - np.maximum(p_start[j], y_start)
+        union = np.maximum(p_end[j], y_end) - np.minimum(p_start[j], y_start)
+        IoU = (1.0 * intersection / union) * ([p_label[j] == y_label[x] for x in range(len(y_label))])
+        # Get the best scoring segment
+        idx = np.array(IoU).argmax()
+
+        if IoU[idx] >= overlap and not hits[idx]:
+            tp += 1
+            hits[idx] = 1
+        else:
+            fp += 1
+    fn = len(y_label) - sum(hits)
+    return float(tp), float(fp), float(fn)
+
+def f1_at_X(gt, preds):
+    metrics = dict()
+    overlap = [.1, .25, .5] # F1 @ [10, 25, 50]
+    tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
+    for s in range(len(overlap)):
+        tp1, fp1, fn1 = f_score(preds, gt, overlap[s])
+        tp[s] += tp1
+        fp[s] += fp1
+        fn[s] += fn1
+    for s in range(len(overlap)):
+        precision = tp[s] / float(tp[s] + fp[s])
+        recall = tp[s] / float(tp[s] + fn[s])
+
+        f1_ = 2.0 * (precision * recall) / (precision + recall)
+        f1_ = np.nan_to_num(f1_) * 100
+        metrics[f'F1@{(int(overlap[s]*100))}'] = f1_
+        
+    return metrics
 
 def reset_parameters(module):
     if isinstance(module, nn.Linear):
         module.reset_parameters()
+
+
+def compute_edit_score(gt, pred):
+    max_len = max(len(gt), len(pred))
+    return 1.0 - editdistance.eval(gt, pred)/max_len
 
 
 def initiate_model(input_dim, output_dim, transformer_params, learning_params, tcn_model_params, model_name):
@@ -89,54 +160,38 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
             inference_time = (end_time-start_time)/1e6
             inference_time = inference_time/src.shape[0] #divide by batch size to get time for single window
             inference_times.append(inference_time)
-            # threshold = 0.6
-            # by_pred = (y_pred > threshold).int()
-            # nypreds.append(by_pred)
-            # ngts.append(y)
-  
-            # ypreds.append(y_pred)
-            # gts.append(y)
-
-            # input()
 
             pred = torch.argmax(y_pred, dim=-1)
             gt = torch.argmax(y, dim=-1)  # maxpool
-            # gt = torch.argmax(tgt,dim=-1)
 
-            # print(y_pred.shape, y.shape,pred.shape, gt.shape)
+
             pred = pred.cpu().numpy()
             gt = gt.cpu().numpy()
 
+            print(gt,pred)
             ypreds.append(pred)
             gts.append(gt)
 
             loss = criterion(y_pred, y) # maxpool
-            # loss = criterion(y_pred, y)
 
             losses.append(loss.item())
             
             accuracy += np.mean(pred == gt)
 
 
-        # myaccuracy = calc_accuracy(nypreds, ngts)
-        # print("My Accuracy:",myaccuracy)
         ypreds = np.concatenate(ypreds)
         gts = np.concatenate(gts)
+        
+        edit_distance = compute_edit_score(gts, ypreds)
+        f1_score = f1_at_X(gts,ypreds)
 
-        # # get_classification_report(ypreds,gts,test_dataloader.dataset.get_target_names())
 
-        # # Compare each element and count matches
-        # matches = np.sum(ypreds == gts)
-
-        # print('evaluation:', ypreds.shape, gts.shape, matches)
-
-        # # Calculate accuracy
-        # accuracy = matches / len(ypreds)
         accuracy = accuracy/n_batches
         inference_time = np.mean(inference_times)
-        print("Accuracy:", accuracy, 'Inference Time per window:',inference_time)
+        print("Accuracy:", accuracy, 'Edit Score:',edit_distance, 'F1@X:',f1_score,'Inference Time per window:',inference_time)
 
-        return np.mean(losses), accuracy, inference_time, ypreds, gts
+
+        return np.mean(losses), accuracy, inference_time,  ypreds, gts, edit_distance, f1_score
 
 # train loop, calls evaluation every epoch
 def traintest_loop(train_dataloader, test_dataloader, model, optimizer, scheduler, criterion, epochs, dataloader, subject, modality):
@@ -147,6 +202,7 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
     
     ypreds, gts = [],[]
     highest_acc = 0
+    highestypreds, highestygts = [],[]
     
     file_path = f'./model_weights/Modality_M{modality}_S0{subject}_best_model_weights.pth'
     
@@ -169,7 +225,7 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             y = find_mostcommon(tgt, device) #maxpool
             # y = tgt
    
-            y_pred = model(src)  # [64,10]
+            y_pred =  model(src)  # [64,10]
             # print('input, prediction, yseq, gt:',src.shape, y_pred.shape,  y.shape, tgt.shape)
             # input()
             
@@ -188,18 +244,20 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
             f"Training Epoch {epoch+1}, Training Loss: {running_loss / len(train_dataloader):.6f}")
 
         # evaluation loop
-        val_loss, accuracy, inference_time, ypreds, gts = eval_loop(model, test_dataloader, criterion, dataloader)
+        val_loss, accuracy, inference_time, ypreds, gts, edit_distance, f1_score = eval_loop(model, test_dataloader, criterion, dataloader)
         print(f"Valdiation Epoch {epoch+1}, Validation Loss: {val_loss:.6f}")
 
         if(accuracy > highest_acc): # save only if the accuracy is higher than before
             highest_acc = accuracy
+            highestygts = gts
+            highestypreds = ypreds
             # Save the model weights to the file
-            torch.save(model.state_dict(), file_path)
+            # torch.save(model.state_dict(), file_path)
 
 
         total_accuracy.append(accuracy)
     
-    results = {'subject':subject, 'prediction':ypreds, 'groundtruth':gts}
+    results = {'subject':subject, 'prediction':highestygts, 'groundtruth':highestypreds}
     df = pd.DataFrame(results)
 
     df_outpath = './results/model_outputs/'
@@ -212,7 +270,7 @@ def traintest_loop(train_dataloader, test_dataloader, model, optimizer, schedule
 
     df.to_csv(f'{df_outpath}S0{subject}_output.csv')
     
-    return val_loss, accuracy, total_accuracy, inference_time
+    return val_loss, accuracy, total_accuracy, inference_time, edit_distance, f1_score
 
 
 
