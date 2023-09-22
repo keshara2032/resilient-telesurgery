@@ -3,6 +3,9 @@
 dataset/
 new_dataset/
 
+
+model_weights/*
+
 Datasets/*
 
 ProcessedDatasets/*
