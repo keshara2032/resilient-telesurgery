@@ -81,7 +81,7 @@ dataloader_params = {
     
 }
 
-
+# --context 
 modality_mapping = {
     0: kinematic_feature_names_jigsaws[38:],  # Kinematic (38)
     1: kinematic_feature_names_jigsaws_patient_position,  # Kinematic (14)
@@ -104,6 +104,7 @@ modality_mapping = {
     18: kinematic_feature_names_jigsaws_patient_position + segmentation_features + state_variables,  # Kinematic (14) + Segmentation Masks + Context(GT)
     19: kinematic_feature_names_jigsaws[38:] + segmentation_features + state_variables,  # Kinematic (38) + Segmentation Masks + Context(GT) + Colins
     20: kinematic_feature_names_jigsaws_patient_position + segmentation_features + state_variables,  # Kinematic (14) + Segmentation Masks + Context(GT) + Colins
+    21: kinematic_feature_names_jigsaws_patient_position  + img_features,  # Kinematic (14)  + Resnet
 }
 
 
