@@ -3,6 +3,8 @@
 dataset/
 new_dataset/
 
+results/
+
 
 model_weights/*
 

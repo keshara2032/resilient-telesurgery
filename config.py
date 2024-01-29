@@ -59,14 +59,14 @@ transformer_params = {
 learning_params = {
     # "lr": 8.906324028628413e-5,
     "lr": 1e-05,
-    "epochs": 20,
-    "weight_decay": 5e-5,
+    "epochs": 8,
+    "weight_decay": 1e-5,
     "patience": 3
 }
 
 dataloader_params = {
     
-    "batch_size": 10,
+    "batch_size": 5,
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "observation_window": 30,

@@ -37,7 +37,7 @@ Please follow the below instructions to setup the code in your environment.
 1. Create the conda environment using the environment file. ``` conda env create -f environment.yml```
 2. Verify PyTorch was installed correclty.
 3. Place the preprocessed data in the **ProcessedData**.
-4. Verify the configuration is as required in **config.py**. Learning parameters are defined in **config.py**.
+4. Verify the configuration is as required in ```config.py```. Learning parameters are defined in ```config.py```.
 
 ## Usage
 
@@ -45,15 +45,21 @@ To reproduce gesture recognition results use the following command with the orig
 
 ``` python train_recognition.py --model transformer --dataloader v2 --modality 16 ```
 
+Results will be in the **results** folder specifically in following files.
+1. ```train_results.json``` : Detailed results for each subject in LOUO setup.
+2. ```Train_{task}_{model}_{date-time}.csv ``` : Final results of the run.
+
+
 ## Contributing
 
-Explain how others can contribute to your project. Include guidelines for submitting bug reports or feature requests.
+Please feel free to improve the model, add features and use this for research purposes.
 
+If you have any questions, please feel free to reach out using the following email addresses (cjh9fw@virginia.edu, ydq9ag@virginia.edu)
 ## License
 
 Specify the license under which your project is distributed. For example, [MIT License](https://opensource.org/licenses/MIT).
 
 ## Acknowledgements
 
-Give credit to other projects, tutorials, or resources that inspired or helped your project.
+Special Thanks to [Colin Lea](https://github.com/colincsl/TemporalConvolutionalNetworks/tree/master) for providing features for the dataset and inspiring further development in action segmentation. 
 
