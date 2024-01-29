@@ -1,4 +1,4 @@
-name: pytorch
+name: icra24
 channels:
   - anaconda
   - conda-forge
@@ -193,7 +193,6 @@ dependencies:
     - platformdirs==4.1.0
     - positional-encodings==6.0.1
     - protobuf==4.24.0
-    - pyaudio==0.2.13
     - pycocotools==2.0.7
     - pyparsing==3.0.9
     - pytz==2023.3
@@ -229,4 +228,4 @@ dependencies:
     - urllib3==2.0.4
     - wandb==0.16.1
     - yapf==0.40.2
-prefix: /home/kesharaw/anaconda3/envs/pytorch
+prefix: /home/kesharaw/anaconda3/envs/icra24

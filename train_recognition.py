@@ -42,7 +42,7 @@ parser = argparse.ArgumentParser(description="A simple command-line argument par
 # Add arguments
 parser.add_argument("--model", help="Specify which model to run", required=True)
 parser.add_argument("--dataloader", help="Specify which dataloader", required=True)
-parser.add_argument("--context", help="Specify which modality combo", required=True, type=int)
+parser.add_argument("--modality", help="Specify which modality combo", required=True, type=int)
 # parser.add_argument("--verbose", action="store_true", help="Enable verbose mode")
 
 # Parse the arguments
@@ -51,7 +51,7 @@ args = parser.parse_args()
 # Access the parsed arguments
 model_name = args.model
 dataloader = args.dataloader
-context = args.context
+context = args.modality
 # verbose_mode = args.verbose
 
 
@@ -76,9 +76,9 @@ epochs = learning_params["epochs"]
 observation_window = dataloader_params["observation_window"],
 
 
-if(dataloader == "kw"):
+if(dataloader == "v1"):
     train_dataloader, valid_dataloader = generate_data(dataloader_params["user_left_out"],task,Features, dataloader_params["batch_size"], observation_window)
-else:
+elif dataloader == "v2":
     train_dataloader, valid_dataloader = get_dataloaders([task],
                                                      dataloader_params["user_left_out"],
                                                      dataloader_params["observation_window"],
@@ -107,6 +107,9 @@ else:
     print("Test Max Length: ", valid_dataloader.dataset.get_max_len())
     print("Features: ", train_dataloader.dataset.get_feature_names())
 
+else:
+    print("Invalid dataloader choice!")
+    exit(-1)
 
 batch = next(iter(train_dataloader))
 features = batch[0].shape[-1]
