@@ -66,7 +66,7 @@ learning_params = {
 
 dataloader_params = {
     
-    "batch_size": 5,
+    "batch_size": 10,
     "one_hot": True,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "observation_window": 30,
