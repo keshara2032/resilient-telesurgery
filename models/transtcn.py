@@ -161,30 +161,18 @@ class TransformerModel(nn.Module):
     # tcn + transformer
     def forward(self, x):
         
-        
-        # x = self.fc(x)
-        # x = x.permute(0,2,1)
-        # x = self.msrnn(x,x)
-        # x = self.max_pool(x) # gets rid of seq_len
-        # print(x.shape)
-        # input()
-        
-        
         x = self.encoder(x)
         
         x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
-        # x = self.pe(x)
+        x = self.pe(x)
         
         x = self.transformer(x)
         
         # x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
-        
         # x = self.decoder(x)
-        
         # x = x.permute(0, 2, 1)  # Reshape input to [batch_size, seq_len,features, ]
         
-
         x = self.out(x)
         x = self.max_pool(x) # gets rid of seq_len
         

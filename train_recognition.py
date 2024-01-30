@@ -130,7 +130,7 @@ print(model)
 
 ### Subjects 
 subjects = [2,3,4,5,6,7,8,9]
-# subjects = [7]
+# subjects = [2]
 
 
 accuracy = []
@@ -171,7 +171,7 @@ for i in range(REPEAT):
             rolling_avg = rolling_average(all_acc,3)
             # print('Rolling average:',rolling_avg)
             f1_list = list(f1_score.values())
-            accuracy.append({'run': i,'subject':subject, 'last_accuracy':acc,  'avg_accuracy':np.mean(all_acc), 'highest_accuracy':np.max(all_acc), 'rolling_average':rolling_avg[-1], 'edit_score':edit_distance, 'F1@10':f1_list[0], 'F1@25':f1_list[1], 'F1@50':f1_list[2],  'avg_inference_time':inference_time})
+            accuracy.append({'run': i,'subject':subject,  'accuracy':np.max(all_acc), 'rolling_average':rolling_avg[-1], 'edit_score':edit_distance, 'F1@10':f1_list[0], 'F1@25':f1_list[1], 'F1@50':f1_list[2],  'avg_inference_time':inference_time})
 
 
 if(RECORD_RESULTS):

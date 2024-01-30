@@ -168,7 +168,7 @@ def eval_loop(model, test_dataloader, criterion, dataloader):
             pred = pred.cpu().numpy()
             gt = gt.cpu().numpy()
 
-            print(gt,pred)
+            # print(gt,pred)
             ypreds.append(pred)
             gts.append(gt)
 
