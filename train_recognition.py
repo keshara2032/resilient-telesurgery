@@ -29,11 +29,9 @@ from genutils.utils import *
 import datetime
 import argparse
 
+# end of imports #
 
 torch.manual_seed(0)
-
-
-# end of imports #
 
 
 # Create an ArgumentParser object
@@ -55,14 +53,8 @@ context = args.modality
 # verbose_mode = args.verbose
 
 
-# manual seeding ensure reproducibility
-# torch.manual_seed(0)
-
-
-
 # tasks and features to be included
 task = "Suturing"
-
 
 # context = dataloader_params["context"]
 
@@ -118,10 +110,6 @@ input_dim = features
 
 print("Input Features:",input_dim, "Output Classes:",output_dim)
 
-
-### DEFINE MODEL HERE ###
-# model_name = 'tcn' 
-# model_name = 'transformer'
 
 model,optimizer,scheduler,criterion = initiate_model(input_dim=input_dim,output_dim=output_dim,transformer_params=transformer_params,learning_params=learning_params, tcn_model_params=tcn_model_params, model_name=model_name)
 
